@@ -20,7 +20,8 @@ sys.stderr.reconfigure(encoding="utf-8")
 
 # 采集名称、控件类型、自动化标识、屏幕矩形及可用性，不从截图文字推断控件身份。
 def describe(control):
-    """保留控件名称、类型和实际屏幕位置，供界面操作定位使用。"""
+    """保留控件名称、类型和实际屏幕位置，供界面操作定位使用。
+    返回的矩形采用屏幕坐标，调用方可把它用于截图裁剪或后台消息定位。"""
     rect = control.rectangle()
     return {
         "name": control.window_text(),
@@ -35,7 +36,8 @@ def describe(control):
 # 每次只执行参数指定的一种动作，Windows 列表模式不要求目标句柄。
 # 其他动作绑定指定句柄，实际输入前将测试窗口带到前台。
 def main():
-    """每次调用只执行一个明确动作，避免依赖未经观察的界面状态。"""
+    """每次调用只执行一个明确动作，避免依赖未经观察的界面状态。
+    windows 动作只读取桌面窗口，其余动作都通过 handle 绑定一个已经选定的窗口。"""
     parser = argparse.ArgumentParser()
     parser.add_argument("action", choices=["windows", "tree", "shot", "click", "keys", "text", "toggle", "select"])
     parser.add_argument("--handle", type=int)
@@ -136,7 +138,7 @@ def main():
             window.set_focus()
             send_keys(args.value, with_spaces=True, vk_packet=True)
             result = {"action": args.action, "completed": True}
-    # 结果按 JSON 输出，ensure_ascii 保护终端字符边界，不改变内部中文数据。
+    # 结果按 JSON 输出，ensure_ascii 保护终端字符边界，不改变内部中文数据；截图动作额外返回实际绝对路径。
     print(json.dumps(result, ensure_ascii=True))
 
 

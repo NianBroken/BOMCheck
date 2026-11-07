@@ -1,5 +1,5 @@
 /**
- * 对实际 .eext 字节进行独立归档核验，不使用历史宿主结果代替当前包检查。
+ * 对实际 .eext 字节进行独立归档核验，不以构建步骤的返回信息代替当前包检查。
  * 共享运行目录和清单生成器提供预期内容，校验和针对最终压缩包的实际字节计算。
  */
 import assert from 'node:assert/strict';
@@ -30,6 +30,7 @@ export const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
  */
 export async function verifyPackage(bytes) {
 	await synchronizeMetadata(true);
+	// CRC32 检查逐项验证压缩内容完整性，损坏归档会在读取内部文件前失败。
 	const archive = await JSZip.loadAsync(bytes, { checkCRC32: true });
 	/**
 	 * 排除 ZIP 目录项后对文件名排序，必须恰好等于共享清单，既不能缺文件也不能多带开发文件。
@@ -40,6 +41,7 @@ export async function verifyPackage(bytes) {
 	validateManifest(manifest);
 	assert.deepEqual(manifest, extensionManifest());
 	assert.deepEqual(JSON.parse(archive.comment), exportInfo);
+	// 包内运行文件逐字节对照当前构建目录，确保待验归档对应现有磁盘内容。
 	for (const filename of runtimeFiles)
 		assert.deepEqual(await archive.file(filename).async('nodebuffer'), await fs.readFile(path.join(root, filename)), filename);
 	/**
@@ -58,6 +60,7 @@ export async function verifyPackage(bytes) {
 	 * 此处不调用函数，不访问真实 eda，不用语法存在代替实际工程操作测试。
 	 */
 	const entry = runInNewContext(`${script}; edaEsbuildExportName;`);
+	// 清单中的每个菜单回调都必须能在入口导出对象上找到可调用函数。
 	assert.equal(typeof entry.openBomCheck, 'function');
 	assert.equal(typeof entry.about, 'function');
 	for (const menus of Object.values(manifest.headerMenus)) {

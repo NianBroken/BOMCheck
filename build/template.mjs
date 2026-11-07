@@ -9,10 +9,12 @@ const markers = Object.freeze({
 	css: '/* 应用样式 */',
 	script: '/* 应用脚本 */',
 });
+/** 页面正文标记只接受英文字母键，具体键值必须能在对应数据字典中查到。 */
 const contentPattern = /<!-- (页面标题|页面说明|操作文字|状态提示):([A-Za-z]+) -->/gu;
+/** 此模式只检测构建专用标记，普通 HTML 注释和用户可见文本不触发未完成标记错误。 */
 const unresolvedPattern = /<!-- (?:应用标题|页面导航|页面标题:|页面说明:|操作文字:|状态提示:)|\/\* 应用(?:样式|脚本) \*\//u;
 
-/** 检查模板专用标记是否仍在页面中；普通的说明性中文注释不属于未完成的模板。 */
+/** 检查任一模板专用标记是否仍在页面中；普通说明注释不属于待替换内容。 */
 export function hasTemplateMarkers(html) {
 	return unresolvedPattern.test(html);
 }
@@ -23,6 +25,7 @@ export function hasTemplateMarkers(html) {
  * 脚本中的结束标签转义为 JavaScript 等价写法，防止浏览器提前结束当前脚本元素。
  */
 export function renderTemplate(template, { title, navigation, pages, commands, messages, css, script }) {
+	// 标题与导航先按固定标记替换，其余正文标记再依据类型从相应数据集合取值。
 	const html = template.replace(markers.title, () => title).replace(markers.navigation, () => navigation).replace(contentPattern, (_match, kind, id) => {
 		if (kind === '页面标题' || kind === '页面说明') {
 			const page = pages.find(page => page.id === id);
@@ -42,6 +45,7 @@ export function renderTemplate(template, { title, navigation, pages, commands, m
 			throw new Error(`提示定义无效：${id}`);
 		return messages[id];
 	}).replace(markers.css, () => css.replace(/\/\*![\s\S]*?\*\//gu, '')).replace(markers.script, () => script.replaceAll('</script', '<\\/script'));
+	// 检查最终 HTML 而非单个替换结果，任何遗漏标记都会阻止界面文件进入安装包。
 	if (hasTemplateMarkers(html))
 		throw new Error('页面模板存在未完成替换的标记');
 	return html;

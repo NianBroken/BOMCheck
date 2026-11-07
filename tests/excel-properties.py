@@ -1,6 +1,7 @@
 """在独立 Excel 进程中只读打开导出样例，核对标准与自定义文档属性。
 另开线程观察真实属性对话框并截图，主线程维持 Excel 模态对话框调用。
-最终关闭只读工作簿、退出独立进程并清理临时目录。"""
+最终关闭只读工作簿、退出独立进程并清理临时目录。
+文件路径和报告目录由参数提供，脚本不连接用户已有 Excel 进程，也不写回样例工作簿。"""
 import argparse
 import json
 import sys
@@ -26,7 +27,7 @@ app=win32com.client.DispatchEx('Excel.Application')
 app.Visible=True
 book=app.Workbooks.Open(str(Path(args.file).resolve()),ReadOnly=True)
 report={'standard':{},'custom':{},'tabs':[]}
-# 从 Excel 实际文档属性接口取值，不用工作簿文件名或自建对象替代验证。
+# 从 Excel 实际文档属性接口取值，不用工作簿文件名或自建对象替代验证；标准属性和自定义属性分别保存在报告的两个字典中。
 for key in ['Author','Last Author','Company','Keywords','Comments']:
  report['standard'][key]=book.BuiltinDocumentProperties(key).Value
 for p in book.CustomDocumentProperties:

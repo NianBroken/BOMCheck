@@ -1,6 +1,7 @@
 /**
  * 连接显式端口对应的本机调试目标，执行测试脚本并记录异常和日志事件。
  * 该入口是测试观察工具，不进入插件安装包，也不替代业务层公开宿主 API。
+ * 端口、脚本路径和可选报告路径全部来自命令行，脚本结果保留协议原始结构，便于定位运行时异常。
  */
 /** 调试通道只连接本机测试客户端，用于读取真实宿主状态和控制台记录。 */
 import { readFile, writeFile } from 'node:fs/promises';
@@ -60,6 +61,7 @@ async function main() {
 		});
 	}
 	try {
+		// 先打开运行时和日志域，再执行脚本，保证脚本期间产生的异常与日志都能进入同一份报告。
 		await call('Runtime.enable');
 		await call('Log.enable');
 		const expression = await readFile(sourceFile, 'utf8');

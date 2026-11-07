@@ -12,9 +12,9 @@ export class FilePicker {
 	private cancel?: () => void;
 
 	/**
-	 * 每次创建独立隐藏 input，允许用户再次选择与上次相同的文件。
-	 * 先结束上一个等待，再用 change、cancel 或焦点返回路径结束当前运行 Promise。
-	 * 用户取消返回 undefined，控件打开时的异常拒绝 Promise，所有路径共用一次性清理。
+	 * 每次创建独立隐藏 input，允许用户再次选择与上次相同的文件；控件只接受列出的工作簿和文本清单后缀。
+	 * 开始新选择前先结束上一个等待，再通过 change、cancel 或焦点返回路径结束当前 Promise。
+	 * 用户取消返回 undefined，程序化点击异常拒绝 Promise；所有结束路径都经过 finish，避免重复结算及遗留监听。
 	 */
 	choose(): Promise<File | undefined> {
 		this.dispose();

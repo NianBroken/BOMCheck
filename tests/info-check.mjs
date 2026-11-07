@@ -1,6 +1,7 @@
 /**
  * 核对集中身份、日志业务数据保留、宿主版本范围及 Excel 导出实现指纹。
  * 身份断言与业务断言分开，业务对象中同名字段不会被当成身份元数据删除。
+ * 该测试不写入项目文件，元数据同步使用检查模式，导出函数指纹只用于发现意外的业务实现变化。
  */
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';

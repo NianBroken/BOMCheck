@@ -276,7 +276,7 @@ async function refreshScopes(): Promise<void> {
 
 /**
  * 根据当前表头行重建列选项并清空映射；自动选择只接受唯一的精确“位号”表头。
- * 保留选择模式重用此前列下标，随后使工程结果失效并更新预览。
+ * 保留选择模式重用已有列下标，随后使工程结果失效并更新预览。
  */
 async function refreshHeader(resetReference: boolean): Promise<void> {
 	mappingEditor.clear();

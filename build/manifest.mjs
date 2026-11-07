@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 
 /**
  * 这些发布字段必须是非空且没有首尾空白的字符串，后续规则再检查其格式。
+ * 仓库对象不在此数组中，因为它按 URL 和仓库类型执行独立结构校验。
  */
 const requiredText = [
 	'name',
@@ -40,6 +41,7 @@ const repositoryTypes = new Set([
  * 拒绝非对象及数组清单，逐项检查必需字段后核对名称、UUID、版本和许可证。
  * 发布版本必须为 1.0.0；仓库必须为完整 HTTPS 地址且指向具体仓库。
  * 断言失败会中止调用方构建，避免生成身份不完整的安装包。
+ * 清单中其他未列入必需项的可选字段不会在这里被逐一验证。
  */
 export function validateManifest(manifest) {
 	assert.ok(manifest && typeof manifest === 'object' && !Array.isArray(manifest), '扩展清单必须是对象');
@@ -67,6 +69,7 @@ export function validateManifest(manifest) {
 	assert.ok(url.hostname.includes('.') && url.pathname.split('/').some(Boolean), '仓库地址必须指向具体仓库');
 	assert.ok(!url.username && !url.password && !url.search && !url.hash, '仓库地址不能包含凭据、查询或片段');
 	if (repository.type === 'github') {
+		// GitHub 仓库地址限定为 github.com/所有者/仓库名，不接收子路径或额外页面地址。
 		assert.equal(url.hostname, 'github.com');
 		assert.equal(url.pathname.split('/').filter(Boolean).length, 2, 'GitHub地址必须包含所有者和仓库名');
 	}

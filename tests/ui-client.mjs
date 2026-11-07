@@ -1,6 +1,7 @@
 /**
  * 在真实客户端的根页面或扩展界面上下文执行界面测试，保存返回值和控制台证据。
  * 页面上下文由实际 DOM 标识识别，截图路径和裁剪区域由环境变量显式传入。
+ * root 模式保留宿主编辑器上下文，ui 模式只选择包含扩展 tabs 节点的执行上下文，避免把表达式发给错误窗口。
  */
 import { Buffer } from 'node:buffer';
 import fs from 'node:fs/promises';
@@ -92,6 +93,7 @@ async function main() {
 			awaitPromise: true,
 			returnByValue: true,
 		});
+		// 报告同时保存协议结果和事件列表，调用方可区分表达式返回值、异常详情及控制台输出。
 		/**
 		 * 截图和裁剪由调用者显式指定，Base64 图像转字节保存，页面结果和事件另存 JSON。
 		 */

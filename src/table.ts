@@ -15,7 +15,7 @@ export class DataTable {
 	 */
 	private table?: TabulatorFull;
 	/**
-	 * 最近一次提交的数组引用，更新完成后以引用比较判断是否又收到新数据。
+	 * 最近一次提交的业务记录数组；异步 setData 完成后以引用比较判断期间是否收到另一批数据。
 	 */
 	private records: Record<string, unknown>[] = [];
 	/**
@@ -35,7 +35,7 @@ export class DataTable {
 	 */
 	private queue = Promise.resolve();
 	/**
-	 * 自有空状态节点，可更新标题、说明和类别，不依赖库生成的字符串结构。
+	 * 自有空状态节点，可更新标题、说明和类别，文本通过 textContent 写入，不解释为 HTML。
 	 */
 	private readonly placeholder = document.createElement('div');
 
@@ -122,7 +122,7 @@ export class DataTable {
 				})));
 				/**
 				 * 显示值统一转成文本，完整原记录保存在 original。
-				 * 数据替换期间若记录引用变化，dirty 保持为真，下一次排队刷新继续接收新数据。
+				 * 数据替换期间若 records 引用变化，dirty 保持为真；后续排队的刷新会用新引用再次建立列和数据。
 				 */
 				await this.table.setData(records.map(record => ({
 					original: record,

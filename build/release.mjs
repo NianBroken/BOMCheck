@@ -20,7 +20,7 @@ import { verifyPackage } from './verify-package.mjs';
  * 两份互不依赖的脚本并行编译，资源写入和归档检查按实际依赖顺序进行。
  */
 async function main() {
-	/** 构建只读取系统依赖，内联页面包含完整运行资源，避免宿主递归加载资源的限制。 */
+	/** 根目录从脚本自身位置解析，调用命令时不要求终端预先切换到项目目录。 */
 	const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 	process.chdir(root);
 	await synchronizeMetadata();
@@ -33,6 +33,7 @@ async function main() {
 	 * 构建先返回内存结果，使用 es2020 目标且不保留库的特殊法律注释块。
 	 */
 	const outputs = await Promise.all([
+		// 宿主脚本保留导出对象供扩展引擎按清单中的 registerFn 查找公开函数。
 		esbuild.build({
 			entryPoints: ['src/index.ts'],
 			bundle: true,
@@ -54,6 +55,7 @@ async function main() {
 			minify: true,
 		}),
 	]);
+	// 只有宿主脚本写入 dist/index.js；界面脚本稍后随样式一并写入 iframe/index.html。
 	await fs.mkdir('dist', { recursive: true });
 	await fs.writeFile('dist/index.js', outputs[0].outputFiles[0].text, 'utf8');
 	/**
@@ -64,6 +66,7 @@ async function main() {
 	 * 导航按页面定义顺序生成，首项选中，其他标签暂不进入普通 Tab 键焦点顺序。
 	 */
 	const navigation = pages.map((page, index) => `<button id="tab-${page.id}" role="tab" aria-controls="panel-${page.id}" aria-selected="${index === 0}"${index ? ' tabindex="-1"' : ''}>${page.title}</button>`).join('\n');
+	// 页面说明和操作文字由模板渲染器从页面、命令与消息字典中按标记键读取。
 	/**
 	 * 所有中文模板标记由共享渲染器替换，脚本和样式直接内嵌，宿主无需再递归加载页面资源。
 	 */

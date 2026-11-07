@@ -1,4 +1,4 @@
-<!-- 内嵌页面结构模板，中文占位标记由共享构建器替换为真实标题、字典文字及资源。 -->
+<!-- 这是宿主内嵌窗口使用的页面骨架。构建器以页面、命令和提示字典替换专用标记，并把样式与脚本直接写入最终 HTML。 -->
 <!doctype html>
 <html lang="zh-Hans">
 <head>
@@ -9,42 +9,42 @@
 	<style>/* 应用样式 */</style>
 </head>
 <body>
-	<!-- 导航按页面目录生成，角色及 aria 关联供键盘导航和辅助工具识别当前面板。 -->
+	<!-- 导航按钮由 ui/pages.json 按原有顺序生成。每个按钮通过 aria-controls 指向同 id 的面板，aria-selected 标出当前页。 -->
 	<nav id="tabs" class="tabs" role="tablist" aria-label="功能页面">
 		<!-- 页面导航 -->
 	</nav>
 	<!-- 所有任务共用顶部状态，aria-live 使状态变化能够被辅助工具读取。 -->
 	<p id="status" role="status" aria-live="polite"><!-- 状态提示:initial --></p>
 	<main id="panels">
-		<!-- 文件页维护范围、文件、编码、表头、位号列及匹配规则，完整数据在独立预览页展示。 -->
+	<!-- 文件页收集后续核对所需配置。这里保存当前工程范围、清单解析选项和位号规则，完整解析数据由独立预览页展示。 -->
 		<section id="panel-file" role="tabpanel" aria-labelledby="tab-file">
 			<div class="panel-heading"><h2><!-- 页面标题:file --></h2></div><p class="page-note" role="note"><!-- 页面说明:file --></p>
-			<!-- 工程范围来自宿主 UUID，显示名仅用于识别，重载不会按名称猜测工程身份。 -->
+			<!-- 范围选项由宿主当前工程文档生成，选项值承载范围标识，文字仅供识别。重载按钮重新读取工程范围并使旧核对结果失效。 -->
 			<div class="scope-row"><label class="field">工程范围<select id="scope" data-config></select></label><button id="refresh" data-config><!-- 操作文字:refresh --></button></div>
-			<!-- 文件按钮使用本窗口的原生选择器，编码选项只影响 CSV 和 TSV 的文本解码。 -->
+			<!-- 文件按钮由宿主文件选择接口提供文件字节。编码选择仅用于 CSV 与 TSV 解码，Excel 工作簿按其文件结构解析。文件名节点显示当前选中文件。 -->
 			<div class="file-row"><div class="file-choice"><button id="choose" data-config><!-- 操作文字:choose --></button><span id="filename">尚未选择文件</span></div><label class="field">文本编码<select id="encoding" data-config><option value="auto">自动识别 / UTF-8</option><option value="utf-8">UTF-8</option><option value="gb18030">GB18030 / GBK</option><option value="utf-16le">UTF-16 LE</option><option value="utf-16be">UTF-16 BE</option><option value="big5">Big5</option></select></label></div>
-			<!-- 表头行在界面从一开始，位号列按列位置选择，空表头及重名列均可区分。 -->
+			<!-- 表头行输入按用户可见的一起始行号记录。位号列选项根据列位置生成，因此空表头和同名表头仍可独立选择。 -->
 			<div class="parse-grid"><label class="field">工作表<select id="sheet" data-config></select></label><label class="field">表头行<input id="header" type="number" min="1" step="1" value="1" data-config></label><label class="field">位号列<select id="reference" data-config><option value="">请选择位号列</option></select></label></div>
-			<!-- 分隔符每行保存一个完整字面值，大小写选项决定位号索引是否转为大写。 -->
+			<!-- 每个分隔符输入框保存一个完整字面字符串，解析时按字面拆分而非正则语义。忽略大小写选项控制匹配键是否转为大写。 -->
 			<div class="rules-grid"><div class="separator-field"><h3>位号分隔符</h3><div id="separators"></div><div class="line"><button id="addSeparator" data-config><!-- 操作文字:addSeparator --></button><button id="resetSeparators" data-config><!-- 操作文字:resetSeparators --></button></div><p id="separatorHint" class="field-state" aria-live="polite"></p></div><div class="match-options"><h3>匹配规则</h3><label class="check"><input id="ignoreCase" type="checkbox" data-config>忽略位号大小写</label></div></div>
-			<!-- 核对需要文件及位号列就绪，保存差异还要求当前存在有效核对结果。 -->
+			<!-- 核对按钮在文件及位号列配置有效后启用。差异保存按钮还要求存在当前核对结果，摘要节点显示当前核对计数或等待状态。 -->
 			<div class="actions"><button id="start" class="primary" disabled><!-- 操作文字:start --></button><button id="export" data-result disabled><!-- 操作文字:export --></button><span id="summary"><!-- 状态提示:chooseBom --></span></div>
 
 		</section>
-		<!-- 只展示清洗有效的展开器件，数量区域区分位号记录和来源行，初始由标签控制隐藏。 -->
+		<!-- 预览表只呈现清洗有效的位号记录，单行拆分出的多个位号分别占一条记录。读取摘要另行区分有效记录数和原始来源行数，未选中标签时面板隐藏。 -->
 		<section id="panel-preview" role="tabpanel" aria-labelledby="tab-preview" hidden><div class="panel-heading"><h2><!-- 页面标题:preview --></h2></div><p class="page-note" role="note"><!-- 页面说明:preview --></p><p id="previewState" class="field-state" hidden aria-live="polite"><!-- 状态提示:fileNone --></p><div id="preview" class="data-table"></div></section>
-		<!-- 完整展示工程独有集合，删除目标由业务结果决定，不读取表格排序及筛选。 -->
+		<!-- 工程独有表展示当前核对结果中的完整差异集合。删除按钮提交业务结果中的目标集合，表格排序和筛选只影响显示，不改变删除对象。 -->
 		<section id="panel-project" role="tabpanel" aria-labelledby="tab-project" hidden><div class="panel-heading"><h2><!-- 页面标题:project --></h2></div><p class="page-note" role="note"><!-- 页面说明:project --></p><div id="projectOnly" class="data-table"></div><div class="actions"><button id="delete" class="danger" data-result disabled><!-- 操作文字:delete --></button></div></section>
-		<!-- 清单独有集合保留所有有效来源，缺少工程对应对象时不能填写属性。 -->
+		<!-- 清单独有表保留所有有效来源记录。因为工程中没有匹配图元，这些记录只供核对，不作为属性写入目标。 -->
 		<section id="panel-bom" role="tabpanel" aria-labelledby="tab-bom" hidden><div class="panel-heading"><h2><!-- 页面标题:bom --></h2></div><p class="page-note" role="note"><!-- 页面说明:bom --></p><div id="bomOnly" class="data-table"></div></section>
-		<!-- 空值选项、映射编辑、预演和写入分别设置，来源顺序保存在编辑器模型。 -->
+		<!-- 映射页先确定是否用清单空值清空目标，再维护目标字段和有序来源列。预演展示计划值，实际写入另由确认后的操作触发。 -->
 		<section id="panel-mapping" role="tabpanel" aria-labelledby="tab-mapping" hidden><div class="panel-heading"><h2><!-- 页面标题:mapping --></h2></div><div class="mapping-options"><label class="check"><input id="clearEmpty" type="checkbox" data-config>使用BOM空值清空目标属性</label></div><div class="line mapping-actions"><button id="addMapping" data-result disabled><!-- 操作文字:addMapping --></button><button id="previewWritesButton" data-result disabled><!-- 操作文字:previewWritesButton --></button><button id="run" class="primary" data-result disabled><!-- 操作文字:run --></button></div><p class="page-note" role="note"><!-- 页面说明:mapping --></p><div id="mappings"></div><div id="writePreview" class="data-table"></div></section>
-		<!-- 解析、清洗、映射和执行的问题共用明细表，完整原因不被顶部摘要替代。 -->
+		<!-- 文件解析、数据清洗、映射校验和工程操作的问题汇总到同一张明细表，具体行列及原因保存在记录中，不只显示顶部摘要。 -->
 		<section id="panel-issues" role="tabpanel" aria-labelledby="tab-issues" hidden><div class="panel-heading"><h2><!-- 页面标题:issues --></h2></div><p class="page-note" role="note"><!-- 页面说明:issues --></p><div id="issues" class="data-table"></div></section>
-		<!-- 执行结果保存在独立日志表，日志导出同时携带原值记录与集中身份。 -->
+		<!-- 每次写入或删除的成功、失败、跳过结果在此单独展示。日志导出使用集中身份字段，并包含执行明细及可恢复的修改前数据。 -->
 		<section id="panel-operation" role="tabpanel" aria-labelledby="tab-operation" hidden><div class="panel-heading"><h2><!-- 页面标题:operation --></h2><button id="exportRecord" data-config><!-- 操作文字:exportRecord --></button></div><p class="page-note" role="note"><!-- 页面说明:operation --></p><div id="operation" class="data-table"></div></section>
 	</main>
-	<!-- 原生模态对话框展示完整字段，内部视口独立滚动，内容由文本节点构造。 -->
+	<!-- 详情使用浏览器原生模态对话框。字段和值由脚本逐项创建为文本内容，长记录在内部滚动区浏览，关闭按钮结束当前查看。 -->
 	<dialog id="detail"><div id="detailScroll"><h2>记录全部信息</h2><dl id="detailContent"></dl><button id="closeDetail"><!-- 操作文字:closeDetail --></button></div></dialog>
 	<!-- 内嵌脚本在全部控件之后执行，初始化时能够按稳定 id 取得必需节点。 -->
 	<script>/* 应用脚本 */</script>

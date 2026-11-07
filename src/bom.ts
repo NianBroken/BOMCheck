@@ -12,7 +12,7 @@ import { hasVisible, referenceKey, scalarText, splitReferences } from './rules';
 
 /**
  * 文件后缀决定是否进入文本解码流程，CSV 和 TSV 的大小写使用同一规则。
- * 此判断在 ZIP 识别之前执行，首列以 PK 开头的普通文本仍按文本读取。
+ * 字节签名检查前先判断文件类别，因此首列以 PK 开头的 CSV 或 TSV 仍按文本读取。
  */
 function isTextWorkbook(filename: string): boolean {
 	return /\.(?:csv|tsv)$/i.test(filename);

@@ -1,12 +1,12 @@
 /**
  * 项目共享代码检查配置，采用现有规则集并维持制表符、单引号和分号风格。
- * 构建产物及依赖由 ignores 排除，实际源码、测试和构建脚本由命令入口指定。
+ * 运行源码、测试与构建脚本由检查命令显式传入，发布构建产物和依赖目录由 ignores 排除。
  */
 import antfu from '@antfu/eslint-config';
 
 /**
- * 启用 TypeScript 检查和统一排版，允许专门的日志输出方法，其余 console 使用产生告警。
- * 正式 lint 命令额外要求零告警，不通过降低日志等级规避检查。
+ * 配置 TypeScript 检查与统一排版；console.log、console.warn 和 console.error 可用，其他 console 方法产生告警。
+ * build/check.mjs 在 lint 调用时把允许告警数设为零，因此任何告警都会使检查失败。
  */
 export default antfu({
 	stylistic: {

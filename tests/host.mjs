@@ -1,6 +1,7 @@
 /**
  * 将真实宿主测试编译为浏览器脚本，通过明确指定的客户端和会话调用。
  * 测试使用临时代码文件，不把客户端路径或用户工程标识写进正式插件。
+ * 该入口只负责编译、提交和检查返回结果，工程范围读取、写入回读及删除恢复都在 host-entry.ts 中执行。
  */
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
@@ -19,6 +20,7 @@ async function main() {
 	assert.ok(client && session, '用法：node tests/host.mjs 客户端路径 独立验收会话');
 	const temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'bomcheck-host-'));
 	try {
+		// 浏览器目标使用 IIFE 和固定全局名，便于通过官方 invoke 接口调用导出的宿主测试函数。
 		const bundle = await esbuild.build({
 			entryPoints: ['tests/host-entry.ts'],
 			bundle: true,

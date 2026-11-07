@@ -1,6 +1,7 @@
 /**
  * 在真实客户端调整内嵌窗口尺寸并检查导航、面板溢出和主操作可见性。
  * 页面 id 来自真实页面目录，截图及度量返回都记录在当前运行临时测试输出中。
+ * 每个尺寸都重新设置宿主容器和 iframe，布局断言读取浏览器实际矩形，不根据样式表文本推断结果。
  */
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';

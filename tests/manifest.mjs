@@ -1,6 +1,7 @@
 /**
  * 对发布清单、中文模板和归档写入失败路径执行隔离检查。
  * 所有文件场景使用系统临时目录，不覆盖项目正式安装包。
+ * 清单字段、模板替换和 ZIP 文件集合分别断言，某一类失败不会被其他类别的通过结果掩盖。
  */
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';

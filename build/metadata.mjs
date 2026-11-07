@@ -13,6 +13,7 @@ import { validateManifest } from './manifest.mjs';
 
 /**
  * 冻结集中身份的顶层引用，供构建、运行信息和校验共用，不复制另一个身份字典。
+ * 冻结不递归处理嵌套对象，调用方只读取身份数据，不应把它当作深层不可变副本。
  */
 export const extensionInfo = Object.freeze(info);
 /**
@@ -25,6 +26,7 @@ export const packageName = `${info.name}_v${info.version}.eext`;
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 /**
  * 首页、原理图、PCB 和空白页共用相同菜单生成规则。
+ * 该列表决定发布清单中实际生成的菜单位置，其他宿主页面不会从此处获得菜单。
  */
 const menuLocations = ['home', 'sch', 'pcb', 'blank'];
 
@@ -53,6 +55,7 @@ export function extensionManifest() {
 		'entry',
 	];
 	const common = Object.fromEntries(keys.map(key => [key, info[key]]));
+	// 共同字段按发布清单要求显式选择，以下派生字段单独映射发布者、图标、问题入口和菜单。
 	return {
 		...common,
 		publisher: info.author,
@@ -78,6 +81,7 @@ export function extensionManifest() {
 /**
  * 检查模式比对对象内容且不写文件，生成模式按统一缩进序列化派生文件。
  * 软件包依赖与命令保留，只有身份字段集中同步；锁文件同步根身份而不改依赖记录。
+ * 此函数读取三份派生文件；写入模式只重写 extension.json、package.json 和 package-lock.json。
  */
 export async function synchronizeMetadata(check = false) {
 	validateManifest(info);
@@ -98,6 +102,7 @@ export async function synchronizeMetadata(check = false) {
 		'keywords',
 	].map(key => [key, info[key]]));
 	identity.repository = { type: 'git', url: info.repository.url };
+	// extension.json 的字段由 extensionManifest 生成，npm 身份则合并到现有 package.json 以保留脚本和依赖。
 	const generated = [
 		[
 			'extension.json',
@@ -116,6 +121,7 @@ export async function synchronizeMetadata(check = false) {
 	 */
 	const lockPath = path.join(root, 'package-lock.json');
 	const lock = JSON.parse(await fs.readFile(lockPath, 'utf8'));
+	// 只触及锁文件根项目身份，不修改 packages 中各依赖的版本、来源或完整性记录。
 	lock.name = info.name;
 	lock.version = info.version;
 	Object.assign(lock.packages[''], { name: info.name, version: info.version, license: info.license });
@@ -125,6 +131,7 @@ export async function synchronizeMetadata(check = false) {
 	 */
 	for (const [filename, expected] of generated) {
 		const target = path.join(root, filename);
+		// 检查模式比较解析后的 JSON 结构，因此只忽略排版差异；生成模式才写出带制表符缩进的 UTF-8 文本。
 		if (check)
 			assert.deepEqual(JSON.parse(await fs.readFile(target, 'utf8')), expected, `${filename}与集中元数据不一致，请运行node build/metadata.mjs`);
 		else

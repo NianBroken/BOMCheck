@@ -1,6 +1,7 @@
 /**
  * 在真实宿主中验证范围读取、取消、写入回读、原值恢复和实际删除。
  * 仅允许名字以 BOMCheck_ 开头的独立工程；删除验收会真实移除单个测试器件。
+ * 每个范围都使用当前宿主快照构造最小清单，测试结束后写回每个目标原名称并保存文档，避免把测试值留在工程中。
  */
 import type { BomData } from '../src/model';
 import type { OperationHost } from '../src/operations';
@@ -44,6 +45,7 @@ export async function runHostChecks(): Promise<Record<string, unknown>> {
 	 * 每个范围独立读取快照，空范围只记录数量，不虚构有器件的测试结果。
 	 */
 	for (const scope of ranges.scopes) {
+		// 每个处理范围独立完成读取、写入、恢复和删除，前一范围的图元身份不会用于下一范围。
 		stage = `读取${scope.kind}/${scope.id}`;
 		const before = await host.readScope(scope);
 		const target = before.find(item => item.designator);

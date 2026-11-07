@@ -1,5 +1,5 @@
-/* 页面使用固定导航和独立滚动面板，窄窗口下表单按内容宽度自动换行。 */
-/* 集中设置字体、字号和主题颜色变量，控件采用浅色配色。 */
+/* 页面外层固定在宿主提供的视口内，导航和状态保持可见，具体面板各自滚动。窄屏配置采用单列布局。 */
+/* 全局字体和主题色在此集中定义，后续控件通过 inherit 或变量复用，保证页面与表格的基础色值一致。 */
 :root {
 	font-family: "Microsoft YaHei UI", "Microsoft YaHei", system-ui, sans-serif;
 	font-size: 13px;
@@ -16,17 +16,19 @@
 [hidden] { display: none !important; }
 /* 视口形成纵向弹性容器，导航及提示占自身高度，剩余空间交给主区。 */
 body { margin: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
-/* 表单继承页面字体，中文控件与正文使用一致的字形及字号。 */
+/* 表单控件继承正文的字体设置，避免浏览器默认表单字体与中文页面出现字形或字号差异。 */
 button, input, select { font: inherit; }
+/* 按钮、输入框和选择框共用最小点击高度、边框和圆角，输入区域另设背景与内边距。 */
 button, input, select { min-height: 34px; border: 1px solid #c9d3df; border-radius: 5px; color: inherit; }
 input, select { padding: 6px 10px; background: white; min-width: 0; }
+/* 按钮文字保持在同一行，外层弹性容器负责安排按钮之间的换行。 */
 button { padding: 7px 13px; background: #fff; cursor: pointer; white-space: nowrap; }
 /* 可用按钮才响应悬停，禁用按钮采用独立配色和鼠标样式。 */
 button:hover:enabled { background: #edf3fd; border-color: #97b5e8; }
 button:disabled { color: #8a96a6; background: #f2f4f7; border-color: #e0e5ec; cursor: default; }
 /* 键盘焦点以外轮廓提示，不改变原有控件占位。 */
 button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid #76a6f8; outline-offset: 2px; }
-/* 主要动作使用共享强调色，禁用时降低对比。 */
+/* 主要动作使用主题强调色，悬停时加深背景，禁用态用浅色区分且不显示可点击效果。 */
 .primary { background: var(--accent); color: white; border-color: var(--accent); }
 .primary:hover:enabled { background: #1954bd; color: white; }
 .primary:disabled { background: #dbe6f9; color: #819abd; }
@@ -36,19 +38,18 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 h2 { font-size: 17px; font-weight: 600; margin: 0; }
 h3 { font-size: 13px; font-weight: 600; margin: 0 0 10px; }
 p { margin: 0; line-height: 1.65; }
-/* 所有标签始终可见，导航换行不会产生横向溢出。 */
-/* 标签允许按内容换行，所有入口在窄窗口仍可到达。 */
+/* 页面标签允许在可用宽度不足时换行，入口不会被裁掉。选中项依据 aria-selected 展示当前状态。 */
 .tabs { flex: none; display: flex; flex-wrap: wrap; gap: 4px; padding: 10px 14px; background: #fff; border-bottom: 1px solid var(--border); }
 .tabs button { border-color: transparent; background: transparent; color: #526277; padding: 8px 12px; }
 .tabs button[aria-selected="true"] { color: #1d58bc; background: #edf3ff; border-color: #cfdef8; font-weight: 600; }
-/* 顶部状态不随面板滚动，长文字允许在任意位置换行。 */
+/* 状态栏位于主面板之外，不随内容滚动。长文件名、诊断文字和计数允许在任意字符处折行。 */
 #status { flex: none; min-height: 36px; margin: 10px 16px 0; padding: 8px 12px; border: 1px solid #d9e5f8; border-radius: 5px; color: #365d8a; background: #edf4ff; font-size: 12px; overflow-wrap: anywhere; }
 #status.error { background: #fff2ef; color: #a33626; border-color: #f0d0c8; }
-/* 主区可在弹性布局内缩小，内部面板承担滚动，防止页面双重溢出。 */
+/* 主区允许在纵向弹性布局中缩小，并裁住自身溢出；其子面板承担实际滚动，避免页面和面板同时滚动。 */
 main { position: relative; flex: 1; min-height: 0; min-width: 0; padding: 12px 16px 16px; overflow: hidden; }
 /* 每个面板占满主区高度，长表单在面板内滚动。 */
 section { position: relative; height: 100%; min-width: 0; overflow: auto; background: white; border: 1px solid var(--border); border-radius: 8px; padding: 20px; }
-/* 标题与操作共用可换行弹性行，空间不足时仍保留可用间距。 */
+/* 标题和同一行操作按剩余空间排列，宽度不足时整项换行，间距由 gap 保持一致。 */
 .panel-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
 /* 页面说明及状态使用次级文字，长文件名与输入证据允许换行。 */
 .page-note, .field-state { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
@@ -56,19 +57,19 @@ section { position: relative; height: 100%; min-width: 0; overflow: auto; backgr
 .field-state { margin: 10px 0; }
 .mapping-options { margin: 0 0 12px; }
 .mapping-actions { margin: 0 0 16px; }
-/* 标签和控件纵向排列，控件填满所属列并允许宽度收缩。 */
+/* 字段标题在控件上方显示，字段可缩小到网格列的实际宽度，内部输入控件占满所在列。 */
 .field { display: flex; flex-direction: column; gap: 7px; min-width: 0; font-weight: 500; }
 .field select, .field input { width: 100%; font-weight: 400; }
-/* 范围占剩余宽度，重载按钮按内容占位并与下拉框底边对齐。 */
+/* 工程范围选择框占据可伸缩列，重载按钮按自身文字宽度排列，并与字段底边对齐。 */
 .scope-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: end; margin-bottom: 12px; }
-/* 常规窗口中文件和编码分列，窄窗口由媒体规则合为单列。 */
+/* 常规宽度下文件选择区和编码选择区分列，窄窗口断点下两者纵向排列。 */
 .file-row { display: grid; grid-template-columns: minmax(0, 1fr) 220px; gap: 18px; align-items: end; margin-bottom: 12px; }
 /* 按钮与文件名同行，文件名可换行，操作文字保持完整。 */
 .file-choice { display: flex; gap: 12px; align-items: center; min-width: 0; padding: 10px; border: 1px dashed #cbd6e4; border-radius: 6px; background: #fafbfd; }
 #filename { color: #56677d; overflow-wrap: anywhere; min-width: 0; }
-/* 工作表、行号和位号列设置不同列宽，数字行号保持紧凑。 */
+/* 工作表与位号列依据可用宽度伸缩，数字行号固定较窄宽度，避免挤占长表头。 */
 .parse-grid { display: grid; grid-template-columns: minmax(130px, 1fr) 110px minmax(180px, 2fr); gap: 16px; }
-/* 分隔符和匹配规则分列，顶部分隔线区分两类配置。 */
+/* 位号分隔符编辑区和大小写选项在宽屏并排，分组上边线与前面的文件解析设置区分。 */
 .rules-grid { display: grid; grid-template-columns: minmax(240px, 400px) minmax(170px, 1fr); gap: 28px; padding-top: 14px; margin-top: 14px; border-top: 1px solid #edf0f4; }
 #separators { display: grid; gap: 6px; }
 /* 输入占满剩余宽度，移除按钮按内容占位，多个字符仍属于一个输入。 */
@@ -79,16 +80,15 @@ section { position: relative; height: 100%; min-width: 0; overflow: auto; backgr
 .check { display: flex; gap: 8px; align-items: center; line-height: 1.5; }
 /* 复选框固定尺寸且不随弹性布局压缩，主题色统一。 */
 input[type="checkbox"] { min-height: 0; width: 15px; height: 15px; margin: 0; accent-color: var(--accent); flex: none; }
-/* 主操作和摘要允许换行，顶部分隔线将配置与执行入口区分。 */
+/* 页面主操作按内容换行，摘要占据剩余空间并允许多行，顶部分隔线区分配置区与执行区。 */
 .actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding-top: 16px; margin-top: 16px; border-top: 1px solid #edf0f4; }
 #summary { color: var(--muted); font-size: 12px; flex: 1; min-width: 160px; line-height: 1.65; }
 .mapping select { width: 100%; }
-/* 固定可用表格高度启用虚拟滚动，空列表只保留紧凑的提示区域。 */
-/* 表格高度随视口变化并限制上下界，内部形成虚拟滚动视口。 */
+/* 普通表格按视口高度设置可滚动区域并限制最小、最大高度，空表另用紧凑状态覆盖该高度。 */
 .data-table { height: clamp(240px, 52vh, 580px); max-width: 100%; }
 .data-table.empty-table { height: auto !important; min-height: 112px; background: #f8fafc !important; }
 
-/* 统一库默认字号、边框和背景，标题与数据采用项目配色。 */
+/* 覆盖表格库的基础外观，列标题与数据行沿用项目边框色和浅色底纹。 */
 .tabulator { font-size: 12px; border: 1px solid var(--border) !important; border-radius: 5px; background: #fff !important; }
 .tabulator .tabulator-header, .tabulator .tabulator-header .tabulator-col { background: #f3f6fa; color: #42556d; border-color: var(--border); }
 .tabulator .tabulator-header .tabulator-col .tabulator-col-content { padding: 9px 8px; }
@@ -97,8 +97,7 @@ input[type="checkbox"] { min-height: 0; width: 15px; height: 15px; margin: 0; ac
 .tabulator-row.tabulator-row-even { background: #f8fafc; }
 /* 数据保留空白，长内容通过表格滚动及完整详情读取。 */
 .tabulator-row .tabulator-cell { padding: 8px; border-color: #e8edf3; white-space: pre !important; }
-/* 提示内容按自身高度展开，标题与说明共享居中对齐和有限阅读宽度。 */
-/* 空提示垂直居中，标题和说明自然换行，说明限制最大阅读宽度。 */
+/* 表格空状态在保留的最小区域内垂直居中。标题与说明各自换行，说明文字限制行宽以便阅读。 */
 .table-empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 112px; padding: 24px; text-align: center; white-space: normal; overflow-wrap: anywhere; }
 .table-empty-title { color: #42556d; font-size: 14px; font-weight: 600; line-height: 1.5; }
 .table-empty-description { max-width: 480px; color: var(--muted); font-size: 12px; font-weight: 400; line-height: 1.7; }
@@ -107,26 +106,25 @@ input[type="checkbox"] { min-height: 0; width: 15px; height: 15px; margin: 0; ac
 /* 详情宽高受视口比例限制，外框不滚动，内部视口负责长内容。 */
 dialog { overflow: hidden; width: min(900px,90vw); max-height: 85vh; border: 1px solid #cbd5e1; border-radius: 8px; padding: 24px; }
 dialog::backdrop { background: #182a4266; }
-/* 字段与值分两列，数值文字保留换行，窄窗口采用单列。 */
+/* 详情字段名与内容在宽屏分列，内容保留换行；窄屏由媒体规则改用纵向布局。 */
 dl { display: grid; grid-template-columns: minmax(100px,200px) minmax(0,1fr); gap: 12px; }
 dt { font-weight: 600; overflow-wrap: anywhere; } dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
-/* 窄窗口减少边距，将文件和规则区域合为单列，位号列移到独立行。 */
+/* 视口宽度不超过 760 像素时缩小导航和面板内边距，文件与规则改成单列，位号选择占据整行。 */
 @media(max-width:760px) {
 	.tabs { padding: 8px; gap: 3px; } .tabs button { font-size: 12px; padding: 7px 9px; }
 	main { padding: 10px; } section { padding: 14px; } #status { margin: 8px 10px 0; }
+	/* 文件选择和编码控件纵向排列，避免窄窗把两个可操作字段压缩到难以使用。 */
 	.file-row { grid-template-columns: 1fr; gap: 12px; }
 	.parse-grid { grid-template-columns: minmax(0,1fr) 90px; gap: 12px; } .parse-grid .field:last-child { grid-column: 1/-1; }
 	.rules-grid { grid-template-columns: 1fr; gap: 14px; margin-top: 16px; padding-top: 16px; }
 	.panel-heading { gap: 8px; } dl { grid-template-columns: 1fr; }
 }
 
-/* 文件页的主要操作始终位于可见底边，长列表和窄窗口仍可直接开始核对。 */
-/* 文件页动作栏粘在面板底边，负偏移抵消内边距，背景与阴影隔开滚动内容。 */
+/* 文件面板的核对和差异保存操作随面板滚动固定在底边，背景与阴影遮开下方内容。窄屏负偏移按较小面板内边距同步收窄。 */
 #panel-file .actions { position: sticky; bottom: -20px; z-index: 5; background: #fff; padding: 12px 0; box-shadow: 0 -8px 12px #ffffffed; }
 @media(max-width:760px) { #panel-file .actions { bottom: -14px; } }
 
-/* 空数据没有列头，筛选无结果仍保留现有列与过滤控件。 */
-/* 基础记录为空时隐藏列头；筛选空结果没有 empty-table 类，保留过滤入口。 */
+/* empty-table 仅表示底层记录为空，此时隐藏无筛选作用的列头并缩短表格。过滤后暂时没有匹配行时不带该类，因此仍显示原列头和筛选框。 */
 .tabulator.empty-table .tabulator-header { display: none !important; border: 0; background: transparent; }
 .tabulator.empty-table .tabulator-tableholder { height: auto !important; min-height: 112px; max-height: none !important; background: transparent; }
 .tabulator.empty-table .tabulator-placeholder { min-height: 112px !important; background: transparent; }
@@ -134,8 +132,7 @@ dt { font-weight: 600; overflow-wrap: anywhere; } dd { margin: 0; white-space: p
 #mappings:not(:empty) { margin-bottom: 16px; }
 /* 详情可滚高度扣除内边距，底部关闭按钮通过内部滚动到达。 */
 #detailScroll { max-height: calc(85vh - 48px); overflow: auto; }
-/* 滑块覆盖在原视口上，原生轨道不参与布局，触摸和键盘滚动保持原有语义。 */
-/* 覆盖层不占正文宽度，层本身不截获指针，滑块交互由库处理。 */
+/* 自定义滚动条覆盖在原滚动视口边缘，不占用正文宽度。覆盖层本身不接收指针事件，滑块交互由滚动条库管理。 */
 .scroll-layer { position: absolute; pointer-events: none; z-index: 10; overflow: hidden; }
 /* 滚动主题集中规定尺寸、圆角和悬停按下时的滑块颜色。 */
 .os-theme-bomcheck { --os-size: 9px; --os-padding-perpendicular: 2px; --os-padding-axis: 2px; --os-track-border-radius: 8px; --os-handle-border-radius: 8px; --os-handle-bg: #66768a70; --os-handle-bg-hover: #52657dba; --os-handle-bg-active: #3f5876dd; --os-handle-min-size: 30px; }
@@ -144,11 +141,10 @@ dt { font-weight: 600; overflow-wrap: anywhere; } dd { margin: 0; white-space: p
 [data-overlayscrollbars-viewport] { scrollbar-width: none !important; }
 [data-overlayscrollbars-viewport]::-webkit-scrollbar { display: none !important; width: 0; height: 0; }
 
-/* 映射组按目标、来源顺序和分隔配置分区，窄窗口保持每个操作入口可达。 */
-/* 各映射组纵向排列目标、来源和分隔配置，以边框及间距区分。 */
+/* 每个映射块按目标、来源列表和多来源分隔符纵向组织，边框将不同目标字段分开。窄屏规则把来源动作放到来源列下方。 */
 .mapping { display: flex; flex-direction: column; align-items: stretch; gap: 10px; padding: 16px; margin: 12px 0; border: 1px solid var(--border); border-radius: 6px; }
 .mapping-sources { display: grid; gap: 8px; }
-/* 来源序号、选择和动作分三列，窄窗口把动作放到来源列下方。 */
+/* 每个来源行依次排列顺序编号、来源列选择和来源操作按钮；窄屏下按钮移入第二列的下一行。 */
 .mapping-source { display: grid; grid-template-columns: 24px minmax(120px,1fr) auto; align-items: center; gap: 8px; }
 .source-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 /* 分隔符输入支持纵向调整并保留粘贴原文，由业务校验报告非法字符。 */

@@ -18,6 +18,7 @@ import { runtimeFiles } from './package-files.mjs';
  */
 export async function packageExtension(rootDir: string, outputPath: string): Promise<void> {
 	const zip = new JSZip();
+	// ZIP 注释写入集中导出身份，不影响清单文件集合和宿主读取的入口路径。
 	zip.comment = JSON.stringify(exportInfo);
 	/**
 	 * 逐一完整读取允许发布的运行文件，任一缺失都会在创建输出流之前失败。
@@ -38,9 +39,11 @@ export async function packageExtension(rootDir: string, outputPath: string): Pro
 			compression: 'DEFLATE',
 			compressionOptions: { level: 9 },
 		}), createWriteStream(temporary, { flags: 'wx' }));
+		// 只有压缩流完整写入后才替换目标路径，失败时既不提交半成品也不主动删除既有正式包。
 		await rename(temporary, outputPath);
 	}
 	finally {
+		// 正常重命名后临时路径已不存在，失败时强制删除随机命名的残留文件。
 		await rm(temporary, { force: true });
 	}
 }
