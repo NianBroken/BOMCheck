@@ -1,8 +1,15 @@
+/**
+ * 为真实界面联调建立独立系统临时目录，统一管理截图和中间脚本。
+ * 调用结束即清理目录，需要长期保存的验收证据由调用者显式复制到交付报告。
+ */
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
-/** 联调输出按运行隔离，截图和临时脚本在正常结束或失败时统一清理。 */
+/**
+ * 先创建输出根及 screenshots 子目录，再等待联调动作完整结束。
+ * finally 递归清理当前运行目录，动作异常继续向上传播，不把清理视为测试通过。
+ */
 export async function withTestOutput(action) {
 	const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'bomcheck-ui-'));
 	try {

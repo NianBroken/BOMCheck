@@ -1,5 +1,5 @@
 {
-	"sourceSha256": "9b85f810a4fd47618d063e7ab64aac8c3573b9a81aee4e2b353b0b76aa0b19c4",
+	"sourceSha256": "3f9138616187a511ec7a61486fac0a65bbb83cff9a959d924d55f049f8d0cd5e",
 	"captured": "2026-11-07",
-	"reason": "JSON与插件信息调整期间Excel实现保持不变"
+	"reason": "Excel导出函数去除注释并统一打印后的实现指纹"
 }

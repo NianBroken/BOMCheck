@@ -1,3 +1,7 @@
+/**
+ * 独立测试总入口，先执行身份和归档检查，再编译并运行 TypeScript 业务测试。
+ * 可额外传入真实参考目录，对三份 BOM 和工程归档做固定数量基准核对。
+ */
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -9,6 +13,10 @@ import { synchronizeMetadata } from '../build/metadata.mjs';
 import { checkPluginInfo } from './info-check.mjs';
 import { checkManifestAndPackaging } from './manifest.mjs';
 
+/**
+ * 临时构建只写入调用方建立的测试目录，业务依赖直接复用锁定安装。
+ * 无参考目录时完成独立单元测试后返回，不宣称外部真实样例已经验收。
+ */
 async function run(temporary) {
 	await synchronizeMetadata(true);
 	await checkPluginInfo();
@@ -24,6 +32,9 @@ async function run(temporary) {
 	});
 	const { runUnit } = await import(pathToFileURL(path.resolve(path.join(temporary, 'unit.mjs'))).href);
 	await runUnit();
+	/**
+	 * 将解析和比较入口编译到内存再保存为临时模块，动态导入以调用与正式界面相同的业务实现。
+	 */
 	const output = await esbuild.build({
 		entryPoints: ['tests/live-entry.ts'],
 		write: false,
@@ -42,6 +53,9 @@ async function run(temporary) {
 	/** 参考目录来自命令参数，不把特定用户路径写入项目。 */
 	const referenceDir = process.argv[2];
 	const files = [];
+	/**
+	 * 递归收集非 Office 临时文件的 xlsx，目录和文件都来自显式传入的参考路径。
+	 */
 	async function walk(directory) {
 		for (const entry of await fs.readdir(directory, { withFileTypes: true })) {
 			const full = path.join(directory, entry.name);
@@ -53,11 +67,17 @@ async function run(temporary) {
 	}
 	await walk(referenceDir);
 	const { default: JSZip } = await import('jszip');
+	/**
+	 * 选择参考目录内的工程归档，读取其中 epru 记录以提取 PCB 位号，不根据说明文档生成快照。
+	 */
 	const archivePath = (await fs.readdir(referenceDir)).find(name => name.endsWith('.epro2'));
 	const zip = await JSZip.loadAsync(await fs.readFile(path.join(referenceDir, archivePath)));
 	const log = await zip.file(Object.keys(zip.files).find(name => name.endsWith('.epru'))).async('string');
 	const attributes = new Map();
 	let docType = '';
+	/**
+	 * 按记录分隔符解析元信息和正文，只有 PCB 的 Designator 属性进入参考位号集合。
+	 */
 	for (const line of log.split('\n')) {
 		const delimiter = line.indexOf('||');
 		if (delimiter < 0)
@@ -83,6 +103,9 @@ async function run(temporary) {
 	}));
 	assert.equal(components.length, 782);
 	const reports = [];
+	/**
+	 * 对每份真实清单检查表头、匹配量、双向差异和空位号问题，再导出回读检查两工作表数量。
+	 */
 	for (const filename of files) {
 		const sheets = await loadWorkbook(await fs.readFile(filename), filename);
 		const sheet = sheets[0];
@@ -113,6 +136,9 @@ async function run(temporary) {
 	console.log('三份真实BOM基准与双工作表导出检查通过');
 }
 
+/**
+ * 建立每次运行独立的 .run-* 目录，finally 清理所有临时模块和参考报告。
+ */
 async function main() {
 	const temporary = await fs.mkdtemp(path.resolve('tests/.run-'));
 	try {

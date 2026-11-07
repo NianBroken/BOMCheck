@@ -1,7 +1,17 @@
+/**
+ * 在已打开的真实扩展页面直接运行的异步验收表达式。
+ * 检查初始七页、空表、分隔草稿、任务锁与面板宽度，测试结束恢复默认有效分隔符。
+ */
 /** 在真实内联窗口核验页面结构、空数据、分隔符草稿和操作锁。 */
 (async () => {
+	/**
+	 * 每个断言通过后记录说明，返回数量便于区分完整执行与中途失败。
+	 */
 	const checks = [];
 	const $ = id => document.getElementById(id);
+	/**
+	 * 采用二十秒截止时间等待条件，超时抛错，不无限轮询未达成的界面状态。
+	 */
 	const wait = async (condition) => {
 		const deadline = Date.now() + 20000;
 		while (!condition()) {
@@ -10,12 +20,18 @@
 			await new Promise(resolve => setTimeout(resolve, 50));
 		}
 	};
+	/**
+	 * 断言失败立即终止表达式，通过时才把实际验证项加入 checks。
+	 */
 	const assert = (condition, message) => {
 		if (!condition)
 			throw new Error(message);
 		checks.push(message);
 	};
 	await wait(() => !$('refresh').disabled);
+	/**
+	 * 七页文字与顺序为当前界面契约，逐项核对真实标签节点。
+	 */
 	const names = [
 		'导入设置',
 		'数据预览',
@@ -32,6 +48,9 @@
 	assert(!$('panel-file').querySelector('#preview,details') && $('preview').closest('section') === $('panel-preview'), '原始预览为独立页面');
 	assert(document.querySelectorAll('.page-note').length === 7 && !document.querySelector('.hint,.caption,#bomPreview'), '七页仅保留统一说明位置');
 	assert($('ignoreCase').checked, '默认忽略位号大小写');
+	/**
+	 * 创建空草稿后继续添加应禁用，离开编辑页时空草稿移除且有效配置保留。
+	 */
 	const count = () => $('separators').querySelectorAll('input').length;
 	$('addSeparator').click();
 	assert(count() === 4 && $('addSeparator').disabled, '空行存在时禁用继续添加');
@@ -46,6 +65,9 @@
 	$('addSeparator').click();
 	let draft = $('separators').querySelector('input:last-of-type');
 	draft = $('separators').lastElementChild.querySelector('input');
+	/**
+	 * 普通空格与多字符均为字面位号分隔符，与属性合并分隔符的可见字符规则不同。
+	 */
 	draft.value = ' ';
 	draft.dispatchEvent(new Event('input', { bubbles: true }));
 	assert(!$('addSeparator').disabled, '空格保留为有效字面分隔符');
@@ -70,6 +92,9 @@
 	$('addSeparator').click();
 	$('separators').lastElementChild.querySelector('button').click();
 	assert(count() === 3 && !$('addSeparator').disabled, '删除草稿后恢复添加');
+	/**
+	 * 逐页切换核对唯一说明和可用宽度，覆盖滚动条不应占据正文列宽。
+	 */
 	for (const button of document.querySelectorAll('[role=tab]')) {
 		button.click();
 		const panel = $(button.getAttribute('aria-controls'));

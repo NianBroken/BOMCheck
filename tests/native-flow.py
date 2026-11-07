@@ -1,4 +1,6 @@
-"""通过真实 Windows 控件依次执行验收动作，并保存每步时间和实际状态。"""
+"""按 UTF-8 流程文件顺序驱动指定测试窗口，并记录每步时间与实际状态。
+按钮、输入、选择和截图由流程声明，业务结果仍由真实编辑器产生。
+退出时保存已经完成的步骤，失败不会抹去先前证据。"""
 import argparse
 import json
 import sys
@@ -15,6 +17,7 @@ sys.stdout.reconfigure(encoding="utf-8")
 sys.stderr.reconfigure(encoding="utf-8")
 
 
+# 从参数读取窗口句柄、流程和报告文件，所有相对文件路径以当前工作目录解析。
 def main():
     """流程文件只声明实际控件与输入数据，业务结果由编辑器独立产生。"""
     parser = argparse.ArgumentParser()
@@ -26,11 +29,13 @@ def main():
     root = Path.cwd()
     records = []
 
+    # 只有目标尚未处于前台时切换焦点，等待界面完成短暂绘制后继续。
     def focus():
         if win32gui.GetForegroundWindow() != args.handle:
             window.set_focus()
             time.sleep(0.4)
 
+    # 在三十秒内按类型、名称、标识和序号查询真实控件，非列表项还必须可用。
     def find(kind, name=None, identity=None, index=0):
         deadline = time.monotonic() + 30
         while True:
@@ -43,9 +48,11 @@ def main():
                 raise RuntimeError(f"控件没有就绪：{kind} {name or identity}")
             time.sleep(0.15)
 
+    # 统一通过实际 Button 控件触发动作，调用方分别提供名称或自动化标识。
     def click(name=None, identity=None):
         find("Button", name, identity).click()
 
+    # 展开选择框并定位目标列表项，缺少 UIA 选择接口时直接点击已找到的真实选项。
     def select(name, value, index):
         control = find("ComboBox", name=name, index=index)
         control.expand()
@@ -56,11 +63,13 @@ def main():
             # Chromium 的原生弹出列表没有选择接口时，按实际选项顺序发送标准键盘操作。
             entry.click_input()
 
+    # 从真实 StatusBar 的子控件组合当前文字，等待步骤按该文字判断。
     def status():
         bars = window.descendants(control_type="StatusBar")
         return " ".join(child.window_text() for bar in bars for child in bar.children())
 
     try:
+        # 每个步骤只进入一种匹配动作，文件及保存位置先规范化为实际路径再输入原生对话框。
         for step in json.loads(Path(args.flow).read_text(encoding="utf-8")):
             focus()
             if "click" in step:
@@ -87,6 +96,7 @@ def main():
                 control = find(step.get("kind", "Edit"), name=step.get("name"), identity=step.get("edit"), index=step.get("index", 0))
                 control.set_focus()
                 send_keys("^a" + step["value"] + "{TAB}", with_spaces=True, vk_packet=True)
+            # 最多等待六十秒达到指定状态，超时错误附带实际文字以便核对等待条件。
             elif "wait" in step:
                 deadline = time.monotonic() + 60
                 while step["wait"] not in status():
@@ -101,6 +111,7 @@ def main():
                 window.capture_as_image().save(path)
             records.append({"time": datetime.now().isoformat(), "step": step, "status": status()})
             print(json.dumps({"step": len(records), "status": records[-1]["status"]}, ensure_ascii=True), flush=True)
+    # 始终写出已完成记录，测试失败时也能查看最后实际执行到哪一步。
     finally:
         Path(args.output).write_text(json.dumps(records, ensure_ascii=False, indent=2), encoding="utf-8")
 

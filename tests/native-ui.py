@@ -1,4 +1,6 @@
-"""通过真实扩展窗口验证七个页面和文件选择，测试数据按运行隔离。"""
+"""通过真实扩展窗口验证七个页面、中文文件导入、完整预览及表格交互。
+每次运行建立独立临时 CSV，输出目录由参数选择，窗口置顶状态在退出时恢复。
+控件名称读取项目字典，目标窗口句柄由调用者提供。"""
 import argparse
 import atexit
 import csv
@@ -12,6 +14,7 @@ import win32gui
 from pywinauto import Desktop, mouse
 from pywinauto.keyboard import send_keys
 
+# 载入页面及命令目录后绑定指定窗口，记录原置顶状态，再逐页面核对唯一可见标题。
 def main():
     """窗口标识由调用者提供，页面和按钮名称直接读取项目定义。"""
     parser = argparse.ArgumentParser()
@@ -24,10 +27,12 @@ def main():
     specification = Desktop(backend='uia').window(handle=args.handle)
     window = specification.wrapper_object()
     was_topmost = bool(win32gui.GetWindowLong(args.handle, win32con.GWL_EXSTYLE) & win32con.WS_EX_TOPMOST)
+    # 窗口仍存在且原本未置顶时撤销测试置顶，不把已经置顶的用户窗口改成普通窗口。
     def restore_position():
         if win32gui.IsWindow(args.handle) and not was_topmost:
             win32gui.SetWindowPos(args.handle, win32con.HWND_NOTOPMOST, 0, 0, 0, 0, win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_NOACTIVATE)
     atexit.register(restore_position)
+    # 恢复最小化窗口、保持测试窗口可见并取得焦点，避免后台渲染节流影响可见行。
     def ready_window():
         if win32gui.IsIconic(args.handle):
             win32gui.ShowWindow(args.handle, win32con.SW_RESTORE)
@@ -35,6 +40,7 @@ def main():
         win32gui.SetWindowPos(args.handle, win32con.HWND_TOPMOST, 0, 0, 0, 0, win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_SHOWWINDOW)
         window.set_focus()
     ready_window()
+    # 每次点击前恢复测试窗口，可指定双击及相对控件坐标，业务点击仍作用于实际控件。
     def click(control, double=False, coords=(None, None)):
         """每次点击前恢复指定窗口，控件位置由当前原生界面提供。"""
         ready_window()
@@ -42,6 +48,7 @@ def main():
             control.double_click_input(coords=coords)
         else:
             control.click_input(coords=coords)
+    # 根据当前视口矩形取中心位置发送滚轮，横向操作临时按住 Shift 并在 finally 松开。
     def scroll(distance, horizontal=False, viewport=None):
         ready_window()
         bounds = (viewport or grid).rectangle()
@@ -56,6 +63,7 @@ def main():
     tabs = {item.window_text(): item for item in window.descendants(control_type='TabItem')}
     assert all(page['title'] in tabs for page in pages), '缺少功能标签页'
     report = {'pages': [], 'fileSelection': False, 'preview': False}
+    # 按字典顺序实际切页，最多等待十秒确认标题可见且没有重复标题。
     for page in pages:
         click(tabs[page['title']])
         deadline = time.monotonic() + 10
@@ -69,6 +77,7 @@ def main():
             time.sleep(0.05)
         report['pages'].append(page['id'])
     click(tabs[pages[0]['title']])
+    # 生成一百六十行中文与宽字段清单，为纵横滚动和筛选提供超出初始视口的数据。
     with tempfile.TemporaryDirectory(prefix='bomcheck-native-') as temporary:
         sample = Path(temporary) / '中文预览验收.csv'
         with sample.open('w', encoding='utf-8-sig', newline='') as stream:
@@ -98,6 +107,7 @@ def main():
             time.sleep(0.05)
         report['preview'] = True
         grid = specification.child_window(auto_id='preview', control_type='DataGrid').wrapper_object()
+        # 只选择落在表格实际视口中的数据行，避开虚拟滚动缓存但不在可见区的节点。
         def visible_rows():
             ready_window()
             area = grid.rectangle()
@@ -127,6 +137,7 @@ def main():
         report['horizontalScroll'] = True
         scroll(30, horizontal=True)
         scroll(30)
+        # 用无匹配筛选制造明确空状态，切页回来仍须保留筛选，清除后恢复数据。
         first_filter.set_edit_text('NO_MATCH')
         deadline = time.monotonic() + 10
         while not any('没有匹配记录' in item.window_text() for item in grid.descendants()):
@@ -148,7 +159,8 @@ def main():
         report['filterPreserved'] = True
         click(visible_rows()[0], double=True, coords=(20, 15))
         specification.child_window(auto_id='detail', control_type='Window').wait('visible', timeout=10)
-        detail_viewport = specification.child_window(auto_id='detailScroll', control_type='Group').wrapper_object()
+        # 以实际详情窗口确定滚轮落点，内部普通容器不要求宿主暴露特定 UIA 控件类型。
+        detail_viewport = specification.child_window(auto_id='detail', control_type='Window').wrapper_object()
         scroll(-8, viewport=detail_viewport)
         close_detail = specification.child_window(title=commands['closeDetail'], control_type='Button')
         close_detail.wait('visible enabled', timeout=10)
@@ -156,6 +168,7 @@ def main():
         specification.child_window(auto_id='detail', control_type='Window').wait_not('visible', timeout=10)
         report['detailScroll'] = True
         report['detail'] = True
+        # 需要持久证据时写入调用方目录，否则临时清单随上下文退出清理。
         if args.output:
             directory = Path(args.output)
             directory.mkdir(parents=True, exist_ok=True)

@@ -1,3 +1,7 @@
+/**
+ * 在隔离内存数据及假宿主上验证解析、匹配、填充、删除和 Excel 导出。
+ * 输入工作簿由测试生成，不访问真实工程；需要公开 API 行为的检查由宿主验收入口承担。
+ */
 import type { BomData, ComponentSnapshot, Scope } from '../src/model';
 import type { OperationHost } from '../src/operations';
 import assert from 'node:assert/strict';
@@ -11,6 +15,10 @@ import { executeDelete, executeWrites } from '../src/operations';
 import { DEFAULT_IGNORE_CASE, DEFAULT_SEPARATORS, effectiveSeparators, hasVisible, splitReferences, targetFields } from '../src/rules';
 import { runMergeUnit } from './merge-unit';
 
+/**
+ * 先运行多来源和空状态单元测试，再验证基础规则、编码及操作控制。
+ * 断言失败向外传播，测试入口负责删除临时编译输出。
+ */
 export async function runUnit(): Promise<void> {
 	runMergeUnit();
 	// 编辑界面与解析统一使用完整字面分隔符，空行与重复值不改变有效集合。
@@ -19,6 +27,9 @@ export async function runUnit(): Promise<void> {
 	assert.deepEqual(splitReferences('C1||C2 C3', ['', '||', ' ']), ['C1', 'C2', 'C3']);
 	assert.deepEqual(splitReferences('C1,C2', []), ['C1,C2']);
 
+	/**
+	 * 固定测试工程和文档身份，仅用于内存假宿主，不能作为真实客户端定位参数。
+	 */
 	const scope: Scope = {
 		id: 'pcb',
 		projectId: 'p',
@@ -29,6 +40,9 @@ export async function runUnit(): Promise<void> {
 			{ id: 'd', name: 'test' },
 		],
 	};
+	/**
+	 * 生成具有稳定身份的普通快照，调用方可以传入不同其他属性构造覆盖及保留场景。
+	 */
 	function component(designator: string, other = {}): ComponentSnapshot {
 		return {
 			id: designator,
@@ -43,6 +57,9 @@ export async function runUnit(): Promise<void> {
 			metadata: {},
 		};
 	}
+	/**
+	 * 使用真实工作簿库写出再读回测试清单，避免直接拼装数据而绕过解析路径。
+	 */
 	function bom(rows: string[][]): BomData {
 		const workbook = XLSX.utils.book_new();
 		const sheet = XLSX.utils.aoa_to_sheet([
@@ -60,7 +77,9 @@ export async function runUnit(): Promise<void> {
 	assert.equal(hasVisible(' \n\t\u3000\u200B\u200D\uFEFF'), false);
 	assert.equal(hasVisible(0), true);
 	assert.equal(hasVisible(false), true);
-	/** 偏移表头、重复列名和纵向合并必须保留来源，冲突位号只参与存在性核对。 */
+	/**
+	 * 构造偏移表头、同名列和合并区域，分别检查列位置、继承文字与冲突原始位号证据。
+	 */
 	const structured = XLSX.utils.book_new();
 	const merged = XLSX.utils.aoa_to_sheet([
 		['标题'],
@@ -107,6 +126,18 @@ export async function runUnit(): Promise<void> {
 	]).projectOnly.length, 0);
 	const utf8Csv = readWorkbook(new TextEncoder().encode('位号,说明\nR1,"中文,描述"'), 'test.csv')[0];
 	assert.equal(buildBom(utf8Csv, 'test.csv', 0, 0, DEFAULT_SEPARATORS, false).records[0].values['col:1'], '中文,描述');
+	// 文本文件的首列允许以 PK 开头；文件类型优先于归档字节识别，大小写后缀执行相同规则。
+	for (const extension of ['csv', 'CSV', 'tsv', 'TSV']) {
+		const delimiter = extension.toLowerCase() === 'tsv'
+			? '\t'
+			: ',';
+		const filename = `文本前缀.${extension}`;
+		const parsed = await loadWorkbook(new TextEncoder().encode(`PK${delimiter}位号\n序号${delimiter}R1`), filename);
+		assert.equal(parsed[0].rows.get(0)?.get(0), 'PK');
+		assert.equal(buildBom(parsed[0], filename, 0, 1, DEFAULT_SEPARATORS, false).records[0].designator, 'R1');
+	}
+	// 非文本工作簿继续执行归档校验，损坏的 PK 数据必须拒绝，不转成文本后伪造读取成功。
+	await assert.rejects(() => loadWorkbook(new TextEncoder().encode('PK损坏工作簿'), '损坏.xlsx'));
 	const gbkCsv = Uint8Array.from([
 		0xCE,
 		0xBB,
@@ -134,6 +165,9 @@ export async function runUnit(): Promise<void> {
 	const utf16 = readWorkbook(new Uint8Array(Buffer.from('\uFEFF位号\t说明\nR1\t中文', 'utf16le')), 'test.tsv')[0];
 	assert.equal(buildBom(utf16, 'test.tsv', 0, 0, DEFAULT_SEPARATORS, false).records[0].values['col:1'], '中文');
 
+	/**
+	 * 三个工程器件分别覆盖空原值、已有原值及工程独有场景，清单多位号行用于验证拆分。
+	 */
 	const original = [
 		component('R1', { Description: ' ' }),
 		component('R2', { Description: '原说明', unrelated: '保留' }),
@@ -175,6 +209,9 @@ export async function runUnit(): Promise<void> {
 	let confirms = 0;
 	let writes = 0;
 	let issuePrompts = 0;
+	/**
+	 * 假宿主的当前数据深复制自快照，写入及删除只修改该 Map，读取返回副本。
+	 */
 	const current = new Map(original.map(item => [
 		item.id,
 		structuredClone(item),
@@ -201,6 +238,9 @@ export async function runUnit(): Promise<void> {
 			current.delete(item.id);
 		},
 	};
+	/**
+	 * 检查整批覆盖只确认一次，两个图元各写一次，逐字段回读产生四个成功结果。
+	 */
 	const report = await executeWrites(host, scope, plan, async () => {
 		issuePrompts++;
 	}, () => {});
@@ -226,6 +266,9 @@ export async function runUnit(): Promise<void> {
 	assert.equal(canceled[0].结果, '已取消');
 	assert.equal(writes, 2);
 
+	/**
+	 * 重复 BOM 来源对说明列冲突但编号一致，验证只隔离冲突目标，编号仍能形成变化。
+	 */
 	const duplicates = planWrites(compare(bom([
 		['R1', '甲', '123'],
 		['R1', '乙', '123'],
@@ -259,6 +302,9 @@ export async function runUnit(): Promise<void> {
 		component('R1'),
 	]).matchedCount, 1);
 
+	/**
+	 * 让首个器件读取抛错，后续器件继续处理，检查局部异常没有中止整批。
+	 */
 	const failedFirst = await executeWrites({
 		...host,
 		readOne: async (_scope, item) => {
@@ -270,6 +316,9 @@ export async function runUnit(): Promise<void> {
 	assert(failedFirst.some(row => row.结果 === '失败'));
 	assert(failedFirst.some(row => row.结果 === '成功'));
 
+	/**
+	 * 工程同位号且唯一标识不同，不能作为明确的删除对象；取消也不得修改假宿主。
+	 */
 	const duplicateEngineering = compare(bom([
 		['R1', '', ''],
 	]), [
@@ -317,6 +366,9 @@ export async function runUnit(): Promise<void> {
 	assert.equal(bulkRows.filter(row => row.结果 === '删除成功').length, 2);
 	assert.equal(bulkRows.filter(row => row.结果 === '删除失败').length, 1);
 
+	/**
+	 * 导出后回读单元格类型，等号位号必须是文本且没有公式，编号前导零保持不变。
+	 */
 	const exported = XLSX.read(exportTables([
 		{ 位号: '=R1', 编号: '00123' },
 	], []), { type: 'array' });

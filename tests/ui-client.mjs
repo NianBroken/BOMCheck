@@ -1,8 +1,15 @@
+/**
+ * 在真实客户端的根页面或扩展界面上下文执行界面测试，保存返回值和控制台证据。
+ * 页面上下文由实际 DOM 标识识别，截图路径和裁剪区域由环境变量显式传入。
+ */
 import { Buffer } from 'node:buffer';
 import fs from 'node:fs/promises';
 import process from 'node:process';
 
-/** 调试连接只用于真实客户端的页面观察和测试操作，不替代宿主工程接口。 */
+/**
+ * 连接指定端口的编辑器页面，通过 Runtime 上下文列表定位扩展。
+ * 默认 root 上下文供宿主界面观察，ui 需要实际找到带 tabs 节点的窗口。
+ */
 async function main() {
 	const [port, source, output, scope = 'root'] = process.argv.slice(2);
 	const targets = await fetch(`http://127.0.0.1:${port}/json/list`).then(response => response.json());
@@ -18,6 +25,9 @@ async function main() {
 	const pending = new Map();
 	const contexts = [];
 	const events = [];
+	/**
+	 * 请求响应解除计时器并返回对应结果，运行上下文和异常事件分别积累。
+	 */
 	socket.addEventListener('message', (event) => {
 		const data = JSON.parse(event.data);
 		if (data.id) {
@@ -35,6 +45,9 @@ async function main() {
 			events.push(data);
 		}
 	});
+	/**
+	 * 把协议方法和参数发给当前连接，使用唯一请求 id 和超时报错，不依赖响应到达顺序。
+	 */
 	function call(method, params = {}) {
 		return new Promise((resolve, reject) => {
 			const id = ++serial;
@@ -48,6 +61,9 @@ async function main() {
 		// 实际客户端必须处于前台，后台窗口的滚动事件和虚拟行绘制会被宿主延后。
 		await call('Page.bringToFront');
 		let contextId;
+		/**
+		 * 限定时间内逐上下文检查真实 tabs 节点，未找到时等待新上下文，不按固定编号猜测。
+		 */
 		if (scope === 'ui') {
 			const deadline = Date.now() + 15000;
 			while (!contextId && Date.now() < deadline) {
@@ -65,6 +81,9 @@ async function main() {
 				throw new Error('扩展标签页未在限定时间内加载');
 		}
 
+		/**
+		 * 按 UTF-8 读取测试表达式，在已选上下文等待其 Promise，返回普通值供报告序列化。
+		 */
 		const expression = await fs.readFile(source, 'utf8');
 		const result = await call('Runtime.evaluate', {
 			expression,
@@ -73,6 +92,9 @@ async function main() {
 			awaitPromise: true,
 			returnByValue: true,
 		});
+		/**
+		 * 截图和裁剪由调用者显式指定，Base64 图像转字节保存，页面结果和事件另存 JSON。
+		 */
 		if (process.env.BOMCHECK_SCREENSHOT) {
 			const screenshot = await call('Page.captureScreenshot', {
 				format: 'png',
@@ -92,6 +114,9 @@ async function main() {
 			throw new Error(JSON.stringify(result.exceptionDetails));
 		console.log(JSON.stringify(result.result.value));
 	}
+	/**
+	 * 关闭 WebSocket 并清除尚未结束请求的定时器，不让联调连接保持占用。
+	 */
 	finally {
 		socket.close();
 		for (const request of pending.values()) clearTimeout(request.timer);

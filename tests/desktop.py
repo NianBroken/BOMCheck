@@ -1,4 +1,6 @@
-"""通过 Windows UI Automation 操作指定测试窗口，并保存可核对的控件与截图。"""
+"""通过 Windows UI Automation 观察和操作明确指定的测试窗口。
+控件定位使用实际名称、类型、自动化标识及序号，窗口树和截图供复核真实状态。
+本脚本不进入插件运行包，所有动作由调用者参数决定。"""
 
 import argparse
 import json
@@ -16,6 +18,7 @@ sys.stdout.reconfigure(encoding="utf-8")
 sys.stderr.reconfigure(encoding="utf-8")
 
 
+# 采集名称、控件类型、自动化标识、屏幕矩形及可用性，不从截图文字推断控件身份。
 def describe(control):
     """保留控件名称、类型和实际屏幕位置，供界面操作定位使用。"""
     rect = control.rectangle()
@@ -29,6 +32,8 @@ def describe(control):
     }
 
 
+# 每次只执行参数指定的一种动作，Windows 列表模式不要求目标句柄。
+# 其他动作绑定指定句柄，实际输入前将测试窗口带到前台。
 def main():
     """每次调用只执行一个明确动作，避免依赖未经观察的界面状态。"""
     parser = argparse.ArgumentParser()
@@ -45,6 +50,7 @@ def main():
     parser.add_argument("--background", action="store_true")
     args = parser.parse_args()
     desktop = Desktop(backend="uia")
+    # 返回当前 UIA 可见窗口列表及句柄和进程，供后续调用按真实窗口定位。
     if args.action == "windows":
         result = [dict(describe(w), handle=w.handle, pid=w.process_id()) for w in desktop.windows()]
     else:
@@ -61,6 +67,8 @@ def main():
             path.parent.mkdir(parents=True, exist_ok=True)
             window.capture_as_image().save(path)
             result = {"path": str(path.resolve()), "window": describe(window)}
+        # 显式坐标时相对窗口点击，否则在限定时间内按当前控件树寻找可用目标。
+        # 后台消息模式按屏幕坐标转窗口坐标，普通模式使用真实输入点击。
         elif args.action == "click":
             if args.x is not None:
                 window.set_focus()
@@ -89,12 +97,14 @@ def main():
                     window.set_focus()
                     control.click_input()
             result = {"action": args.action, "completed": True}
+        # 只有当前复选状态与目标不同才切换，重复调用不会把状态反向切回。
         elif args.action == "toggle":
             candidates = [c for c in window.descendants() if c.element_info.control_type == "CheckBox" and (not args.name or c.window_text() == args.name)]
             control = candidates[args.index]
             if control.get_toggle_state() != int(args.value):
                 control.toggle()
             result = {"action": args.action, "state": control.get_toggle_state()}
+        # 展开当前真实下拉框并选择名称完全匹配的列表项，超时无项时明确报错。
         elif args.action == "select":
             # 下拉框通过系统选择接口触发真实表单事件，选项名称来自当前控件树。
             candidates = [c for c in window.descendants() if c.element_info.control_type == "ComboBox" and (not args.name or c.window_text() == args.name) and (not args.id or c.element_info.automation_id == args.id)]
@@ -110,6 +120,7 @@ def main():
                 raise RuntimeError(f"当前下拉框没有选项：{args.value}")
             entries[-1].select()
             result = {"action": args.action, "selected": args.value}
+        # 等待实际 Edit 控件出现后写入文字，不能按未观察到的固定节点位置输入。
         elif args.action == "text":
             deadline = time.monotonic() + 8
             while True:
@@ -125,6 +136,7 @@ def main():
             window.set_focus()
             send_keys(args.value, with_spaces=True, vk_packet=True)
             result = {"action": args.action, "completed": True}
+    # 结果按 JSON 输出，ensure_ascii 保护终端字符边界，不改变内部中文数据。
     print(json.dumps(result, ensure_ascii=True))
 
 

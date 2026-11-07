@@ -1,3 +1,7 @@
+/**
+ * 在真实宿主中分别验证空状态布局、失败状态及有效数据流程。
+ * 测试参数选择模式，所有模式先核对独立工程和既有器件数量，具体写入仅在数据模式发生。
+ */
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs/promises';
@@ -7,12 +11,17 @@ import JSZip from 'jszip';
 import * as XLSX from 'xlsx';
 import { exportInfo, jsonExportInfo } from '../export-info.mjs';
 import { withTestOutput } from './test-output.mjs';
-/** 在真实客户端验证空状态、来源数量切换、导出属性和实际写入回读。 */
+/**
+ * 根据模式执行空布局、读取状态或数据场景，报告及临时脚本放在当前运行隔离目录。
+ */
 async function main(outputDirectory) {
 	const [port, handle, mode = 'empty'] = process.argv.slice(2);
 	const label = String(port);
 	const prefix = `${outputDirectory}/empty-${label}`;
 	let serial = 0;
+	/**
+	 * 子进程继承环境并强制 Python UTF-8，退出失败将真实错误交给断言。
+	 */
 	function run(command, args, extra = {}) {
 		const result = spawnSync(command, args, {
 			encoding: 'utf8',
@@ -24,6 +33,9 @@ async function main(outputDirectory) {
 		});
 		assert.equal(result.status, 0, result.stderr || result.stdout);
 	}
+	/**
+	 * 每步保存脚本和带递增序号的返回报告，通过共用客户端入口执行指定上下文。
+	 */
 	async function evaluate(code, name, scope = 'ui', extra = {}) {
 		const source = `${prefix}-current.js`;
 		const output = `${prefix}-${++serial}-${name}.json`;
@@ -41,9 +53,16 @@ async function main(outputDirectory) {
 	const idle = `(async()=>{${ready}await wait(()=>!$('refresh').disabled);return $('status').textContent;})()`;
 	await evaluate(idle, 'ready');
 	const read = `(async()=>{const p=await eda.dmt_Project.getCurrentProjectInfo();if(!p.friendlyName.startsWith('BOMCheck_'))throw Error('必须使用独立测试工程');const pcbs=await eda.dmt_Pcb.getAllPcbsInfo();if(pcbs.length!==1)throw Error('PCB范围不唯一');if((await eda.dmt_SelectControl.getCurrentDocumentInfo())?.uuid!==pcbs[0].uuid){await eda.dmt_EditorControl.openDocument(pcbs[0].uuid);if(typeof eda.dmt_EditorControl.waitForDocumentReady==='function')await eda.dmt_EditorControl.waitForDocumentReady(pcbs[0].uuid,60000);else await new Promise(r=>setTimeout(r,800));}return {project:p.friendlyName,version:eda.sys_Environment.getEditorCurrentVersion(),components:(await eda.pcb_PrimitiveComponent.getAll()).map(c=>({id:c.getState_PrimitiveId(),ref:c.getState_Designator(),name:c.getState_Name(),other:c.getState_OtherProperty()}))};})()`;
+	/**
+	 * 公开接口读取实际 PCB 快照并检查固定验收工程的器件数，保存初值供后续恢复。
+	 */
 	const before = await evaluate(read, 'snapshot');
 	assert.equal(before.components.length, 479);
 	const report = { version: before.version, project: before.project, checks: [] };
+	/**
+	 * 三种窗口尺寸分别核对六类表格空状态，检查列头隐藏、紧凑高度和页面无横向溢出。
+	 * 此模式不导入清单、不执行写入，完成布局报告后直接返回。
+	 */
 	if (mode === 'empty') {
 		for (const [width, height] of [
 			[1280, 860],
@@ -91,6 +110,9 @@ async function main(outputDirectory) {
 		console.log(`客户端${label}六类空状态与三种尺寸通过`);
 		return;
 	}
+	/**
+	 * 切页后由实际按钮打开文件对话框，原生脚本只处理已打开对话框，避免焦点返回导致取消。
+	 */
 	async function choose(file) {
 		await evaluate('document.getElementById("tab-file").click();document.getElementById("choose").click();true', 'file-page');
 		run('python', [
@@ -104,9 +126,15 @@ async function main(outputDirectory) {
 		await evaluate(idle, 'file-loaded');
 		assert.equal(await evaluate('document.getElementById("filename").textContent', 'filename'), path.basename(file));
 	}
+	/**
+	 * 优先选择当前 PCB 范围，触发正式核对并等待明确完成状态。
+	 */
 	async function check() {
 		return evaluate(`(async()=>{${ready}const pcb=[...$('scope').options].find(o=>o.text.includes(' / PCB / '));if(!pcb)throw Error('没有PCB处理范围');if($('scope').value!==pcb.value){$('scope').value=pcb.value;$('scope').dispatchEvent(new Event('change'));}await wait(()=>!$('start').disabled);$('start').click();await wait(()=>!$('refresh').disabled&&$('status').textContent.includes('器件核对已经完成'));return $('summary').textContent;})()`, 'checked');
 	}
+	/**
+	 * 分别构造未确定位号、没有有效器件和损坏工作簿，核对提示类别及旧计数隐藏。
+	 */
 	if (mode === 'states') {
 		report.states = [];
 		for (const [suffix, content, kind, title] of [
@@ -143,6 +171,9 @@ async function main(outputDirectory) {
 		return;
 	}
 	const referenceFiles = [];
+	/**
+	 * 仅从明确提供的参考目录递归读取真实样例，后续要求数量恰好为三。
+	 */
 	async function findReference(directory) {
 		for (const item of await fs.readdir(directory, { withFileTypes: true })) {
 			const full = path.join(directory, item.name);
@@ -159,6 +190,9 @@ async function main(outputDirectory) {
 		fullPreview: referenceFiles.sort().map(file => ({ file })),
 	};
 	report.baselines = [];
+	/**
+	 * 每个样例实际导入、核对并滚动至末行，截图和预览计数共同记录完整展示结果。
+	 */
 	for (const entry of baseline.fullPreview) {
 		await choose(entry.file);
 		const summary = await check();
@@ -193,6 +227,9 @@ async function main(outputDirectory) {
 			lastAccessible: true,
 		});
 	}
+	/**
+	 * 筛选到无匹配结果后切页，核对表格实例及筛选文字仍然相同，再清除筛选恢复数据。
+	 */
 	const filters = await evaluate(`(async()=>{${ready}const table=$('preview').querySelector('.tabulator-table'),f=$('preview').querySelector('.tabulator-header-filter input');f.value='不存在的器件记录';f.dispatchEvent(new KeyboardEvent('keyup',{key:'x',bubbles:true}));await new Promise(r=>setTimeout(r,450));const result={header:getComputedStyle($('preview').querySelector('.tabulator-header')).display,empty:$('preview').innerText.includes('没有匹配记录')};$('tab-issues').click();$('tab-preview').click();await new Promise(r=>setTimeout(r,100));result.same=table===$('preview').querySelector('.tabulator-table')&&f.value==='不存在的器件记录';f.value='';f.dispatchEvent(new KeyboardEvent('keyup',{key:'x',bubbles:true}));return result;})()`, 'filters');
 	assert.notEqual(filters.header, 'none');
 	assert.equal(filters.empty, true);
@@ -213,6 +250,9 @@ async function main(outputDirectory) {
 		'--dialog-only',
 	]);
 	await evaluate(idle, 'saved-xlsx');
+	/**
+	 * 回读真实保存的工作簿及内部属性 XML，同时检查有效差异行和空工作表结构。
+	 */
 	const bytes = await fs.readFile(xlsx);
 	const book = XLSX.read(bytes, { type: 'buffer' });
 	const zip = await JSZip.loadAsync(bytes);
@@ -237,14 +277,23 @@ async function main(outputDirectory) {
 	await fs.writeFile(csv, '\uFEFF位号,代号,描述\r\nC54,001,甲\r\n', 'utf8');
 	await choose(csv);
 	await check();
+	/**
+	 * 通过增减来源验证单来源隐藏分隔配置、多来源恢复草稿及非法草稿不影响单列预演。
+	 */
 	const sourceChecks = await evaluate(`(async()=>{${ready}$('tab-mapping').click();$('addMapping').click();const p=()=>$('mappings').firstElementChild;const set=(e,v)=>{e.value=v;e.dispatchEvent(new Event('change'));};set(p().querySelector('select'),'standard:name');set(p().querySelector('.mapping-source select'),'col:1');const a={singleHidden:!p().querySelector('textarea')};p().querySelector('[data-action=addSource]').click();set(p().querySelectorAll('.mapping-source select')[1],'col:2');let t=p().querySelector('textarea');a.multiShown=!!t;t.value='|';t.dispatchEvent(new Event('input'));p().querySelectorAll('[data-action=removeSource]')[1].click();a.singleHiddenAgain=!p().querySelector('textarea');p().querySelector('[data-action=addSource]').click();set(p().querySelectorAll('.mapping-source select')[1],'col:2');a.draft=p().querySelector('textarea').value;p().querySelector('textarea').value='\\n';p().querySelector('textarea').dispatchEvent(new Event('input'));p().querySelectorAll('[data-action=removeSource]')[1].click();$('previewWritesButton').click();await wait(()=>!$('refresh').disabled);a.singlePreview=$('status').textContent;a.singleValue=$('writePreview').textContent;return a;})()`, 'source-count');
 	assert.ok(sourceChecks.singleHidden && sourceChecks.multiShown && sourceChecks.singleHiddenAgain);
 	assert.equal(sourceChecks.draft, '|');
 	assert.ok(sourceChecks.singlePreview.includes('有效器件 1'));
 	report.sourceChecks = sourceChecks;
 	// 单列直接填写，多列替换分别核验取消和确认，测试结束恢复独立工程的实际原值。
+	/**
+	 * 保存唯一写入目标的原名称，finally 写回并保存，结束后重新读取核对恢复值。
+	 */
 	const original = before.components.find(c => c.ref === 'C54');
 	assert.ok(original);
+	/**
+	 * 实际执行写入，有确认选择时在根页面找到可见确认按钮，再等待扩展任务结束。
+	 */
 	async function action(answer) {
 		await evaluate('document.getElementById("run").click();true', 'write-click');
 		if (answer) {

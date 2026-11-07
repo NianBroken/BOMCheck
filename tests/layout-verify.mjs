@@ -1,3 +1,7 @@
+/**
+ * 在真实客户端调整内嵌窗口尺寸并检查导航、面板溢出和主操作可见性。
+ * 页面 id 来自真实页面目录，截图及度量返回都记录在当前运行临时测试输出中。
+ */
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs/promises';
@@ -5,7 +9,9 @@ import process from 'node:process';
 import pages from '../ui/pages.json' with { type: 'json' };
 import { withTestOutput } from './test-output.mjs';
 
-/** 客户端内调整真实窗口的内容尺寸，逐项核对布局并截取编辑器实际渲染结果。 */
+/**
+ * 读取端口、截图前缀和目标页，目标必须存在于页面定义，随后遍历三种指定尺寸。
+ */
 async function main(outputDirectory) {
 	const port = process.argv[2];
 	const label = String(port);
@@ -13,12 +19,18 @@ async function main(outputDirectory) {
 	const prefix = process.argv[3] ?? 'layout';
 	const page = process.argv[4] ?? 'file';
 	assert.ok(pages.some(item => item.id === page), '页面标识无效');
+	/**
+	 * 覆盖窄窗口、常规窗口和较大窗口，尺寸同时作为真实 iframe 样式和断言预期。
+	 */
 	const sizes = [
 		[640, 480],
 		[1024, 768],
 		[1280, 860],
 	];
 	const reports = [];
+	/**
+	 * 复用真实客户端上下文执行器，可通过环境变量要求截图和指定裁剪区域。
+	 */
 	function run(source, destination, scope, extra = {}) {
 		const result = spawnSync(process.execPath, [
 			'tests/ui-client.mjs',
@@ -35,6 +47,9 @@ async function main(outputDirectory) {
 		});
 		assert.equal(result.status, 0, result.stderr);
 	}
+	/**
+	 * 先在根页面设置宿主容器及 iframe 尺寸，再在扩展上下文切页并读取真实 DOM 度量。
+	 */
 	for (const [width, height] of sizes) {
 		const source = `${output}/layout-size-current.js`;
 		await fs.writeFile(source, `(()=>{const f=[...document.querySelectorAll('iframe')].find(e=>e.src.startsWith('blob:'));const b=f.parentElement.parentElement,d=b.parentElement;Object.assign(d.style,{position:'fixed',left:'10px',top:'10px',width:'${width}px',height:'${height + 28}px',maxWidth:'none',maxHeight:'none'});Object.assign(b.style,{height:'${height}px',maxHeight:'${height}px'});Object.assign(f.style,{width:'${width}px',height:'${height}px'});return f.getBoundingClientRect().toJSON();})()`, 'utf8');
@@ -54,6 +69,9 @@ async function main(outputDirectory) {
 				scale: 1,
 			}),
 		});
+		/**
+		 * 核对实际内宽高、可见面板、标签边界及文件页核对按钮位置，不能只检查 CSS 字符串。
+		 */
 		const layout = JSON.parse(await fs.readFile(destination, 'utf8')).result.result.value;
 		assert.deepEqual(layout.size, [width, height]);
 		assert.equal(layout.pageOverflow, false);

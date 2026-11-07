@@ -1,3 +1,7 @@
+/**
+ * 管理表格库的按需构建、串行刷新、空状态和完整记录详情。
+ * 业务字段与库内部显示字段分开保存，切页和重绘尽量保留原有交互状态。
+ */
 import type { EmptyState } from './messages';
 import type { Scrollbars } from './scrollbars';
 import { TabulatorFull } from 'tabulator-tables';
@@ -6,19 +10,46 @@ import { scalarText } from './rules';
 
 /** 隐藏面板只保存数据，表格在可见时创建，标签切换保留列和交互状态。 */
 export class DataTable {
+	/**
+	 * 按需建立的真实表格实例，未显示面板只缓存业务记录。
+	 */
 	private table?: TabulatorFull;
+	/**
+	 * 最近一次提交的数组引用，更新完成后以引用比较判断是否又收到新数据。
+	 */
 	private records: Record<string, unknown>[] = [];
+	/**
+	 * 标记列和数据需要重建，单纯可见性或尺寸变化不设置此标记。
+	 */
 	private dirty = true;
+	/**
+	 * 销毁后排队任务直接返回，不再创建表格。
+	 */
 	private disposed = false;
+	/**
+	 * 切页前暂存的滚动坐标，可见重绘后恢复。
+	 */
 	private position?: { left: number; top: number };
+	/**
+	 * 串行连接构建、数据替换和重绘，避免并发访问同一表格实例。
+	 */
 	private queue = Promise.resolve();
+	/**
+	 * 自有空状态节点，可更新标题、说明和类别，不依赖库生成的字符串结构。
+	 */
 	private readonly placeholder = document.createElement('div');
 
+	/**
+	 * 保存容器、详情回调、滚动管理器和默认空状态，在真正建表前准备提示节点。
+	 */
 	constructor(private readonly element: HTMLElement, private readonly onDetail: (record: Record<string, unknown>) => void, private readonly scrollbars: Scrollbars, private readonly emptyState: EmptyState = emptyStates.noResult) {
 		this.updatePlaceholder(emptyState);
 	}
 
-	/** 自有节点承载可访问的状态结构，不依赖表格库为字符串生成的内部类名。 */
+	/**
+	 * 用文本节点设置状态标题和说明，同时声明实时状态语义。
+	 * 既可更新表级空提示，也可为筛选无结果建立独立提示节点。
+	 */
 	private updatePlaceholder(state: EmptyState, target = this.placeholder): HTMLElement {
 		target.className = 'table-empty-state';
 		target.dataset.kind = state.kind;
@@ -34,6 +65,9 @@ export class DataTable {
 		return target;
 	}
 
+	/**
+	 * 替换缓存和提示，清除上批滚动坐标并标记脏数据，再进入可见性检查。
+	 */
 	async show(records: Record<string, unknown>[], emptyState = this.emptyState): Promise<void> {
 		this.updatePlaceholder(emptyState);
 		this.records = records;
@@ -42,7 +76,11 @@ export class DataTable {
 		await this.activate();
 	}
 
-	/** 可见后串行刷新，重绘保留滚动位置，隐藏时不创建表格或等待构建事件。 */
+	/**
+	 * 按队列执行刷新，隐藏、零尺寸或已销毁的容器直接返回。
+	 * 首次创建等待 tableBuilt，再绑定行详情和滚动区域；数据脏时才重建列与显示行。
+	 * 当前任务异常交调用方处理，内部队列恢复可继续接收下一次刷新。
+	 */
 	activate(): Promise<void> {
 		const work = this.queue.then(async () => {
 			if (this.disposed || !this.element.getClientRects().length || !this.element.offsetWidth || !this.element.offsetHeight)
@@ -64,6 +102,10 @@ export class DataTable {
 			}
 			if (this.dirty) {
 				const records = this.records;
+				/**
+				 * 按首次出现顺序形成完整字段并集，库内部使用 f 加序号作为 field。
+				 * 这样业务属性中的点号等字符不会被当作嵌套对象路径。
+				 */
 				const keys = [
 					...new Set(records.flatMap(record => Object.keys(record))),
 				];
@@ -78,6 +120,10 @@ export class DataTable {
 					minWidth: 130,
 					tooltip: true,
 				})));
+				/**
+				 * 显示值统一转成文本，完整原记录保存在 original。
+				 * 数据替换期间若记录引用变化，dirty 保持为真，下一次排队刷新继续接收新数据。
+				 */
 				await this.table.setData(records.map(record => ({
 					original: record,
 					...Object.fromEntries(keys.map((key, index) => [
@@ -100,13 +146,18 @@ export class DataTable {
 		return work;
 	}
 
-	/** 显示状态变化前记录视口位置，浏览器隐藏节点的尺寸不会覆盖该记录。 */
+	/**
+	 * 仅在容器可见时记录真实视口位置，隐藏节点的零尺寸不会覆盖暂存值。
+	 */
 	suspend(): void {
 		const holder = this.element.querySelector('.tabulator-tableholder');
 		if (holder && this.element.getClientRects().length)
 			this.position = { left: holder.scrollLeft, top: holder.scrollTop };
 	}
 
+	/**
+	 * 标记销毁后解除视口滚动层、销毁表格并释放缓存记录。
+	 */
 	destroy(): void {
 		this.disposed = true;
 		const holder = this.element.querySelector<HTMLElement>('.tabulator-tableholder');

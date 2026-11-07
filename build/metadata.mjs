@@ -1,3 +1,7 @@
+/**
+ * 从集中身份 JSON 派生宿主扩展清单、软件包身份和固定版本安装包名称。
+ * 同一模块提供检查与生成模式，其他构建步骤通过它避免各自维护发布身份。
+ */
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -7,16 +11,34 @@ import info from '../extension-info.json' with { type: 'json' };
 import commands from '../ui/commands.json' with { type: 'json' };
 import { validateManifest } from './manifest.mjs';
 
-/** 身份信息只在extension-info.json定义，宿主清单和包描述均为可验证的生成结果。 */
+/**
+ * 冻结集中身份的顶层引用，供构建、运行信息和校验共用，不复制另一个身份字典。
+ */
 export const extensionInfo = Object.freeze(info);
+/**
+ * 按集中名称及版本生成最终 .eext 文件名，不从已有产物推断版本。
+ */
 export const packageName = `${info.name}_v${info.version}.eext`;
+/**
+ * 以当前模块位置解析仓库根目录，不要求调用者位于特定用户桌面。
+ */
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+/**
+ * 首页、原理图、PCB 和空白页共用相同菜单生成规则。
+ */
 const menuLocations = ['home', 'sch', 'pcb', 'blank'];
 
-/** 菜单位置共享同一生成规则，所有标题和标识与集中元数据保持一致。 */
+/**
+ * 先校验集中身份，再选择宿主清单实际接收的字段。
+ * 显示用英文名等自有字段不直接写入宿主清单，作者映射为 publisher。
+ * 各菜单位置派生不同标识，但共同注册 openBomCheck 和 about 两个公开函数。
+ */
 export function extensionManifest() {
 	validateManifest(info);
 	// 自有展示字段不直接写入宿主清单，清单字段按平台规范明确选择。
+	/**
+	 * 明确选取需要发布给宿主的身份字段，避免直接扩散集中 JSON 中的自有配置。
+	 */
 	const keys = [
 		'name',
 		'uuid',
@@ -53,13 +75,19 @@ export function extensionManifest() {
 	};
 }
 
-/** 检查模式不改写文件，生成模式只同步身份字段并保留软件包依赖及构建命令。 */
+/**
+ * 检查模式比对对象内容且不写文件，生成模式按统一缩进序列化派生文件。
+ * 软件包依赖与命令保留，只有身份字段集中同步；锁文件同步根身份而不改依赖记录。
+ */
 export async function synchronizeMetadata(check = false) {
 	validateManifest(info);
 	assert.equal(info.englishName, 'BOMCheck');
 	assert.equal(info.version, '1.0.0');
 	const packagePath = path.join(root, 'package.json');
 	const packageJson = JSON.parse(await fs.readFile(packagePath, 'utf8'));
+	/**
+	 * 从唯一身份来源筛选软件包公共信息，仓库类型转换为 npm 使用的 git。
+	 */
 	const identity = Object.fromEntries([
 		'name',
 		'version',
@@ -83,12 +111,18 @@ export async function synchronizeMetadata(check = false) {
 			},
 		],
 	];
+	/**
+	 * 只同步锁文件顶层及根软件包的名称、版本和许可证，依赖安装树继续保持锁定。
+	 */
 	const lockPath = path.join(root, 'package-lock.json');
 	const lock = JSON.parse(await fs.readFile(lockPath, 'utf8'));
 	lock.name = info.name;
 	lock.version = info.version;
 	Object.assign(lock.packages[''], { name: info.name, version: info.version, license: info.license });
 	generated.push(['package-lock.json', lock]);
+	/**
+	 * 对每个派生文件进行对象级比较或 UTF-8 写入。检查失败包含具体文件名和重新生成入口。
+	 */
 	for (const [filename, expected] of generated) {
 		const target = path.join(root, filename);
 		if (check)
@@ -98,6 +132,9 @@ export async function synchronizeMetadata(check = false) {
 	}
 }
 
+/**
+ * 只有作为直接命令入口执行时才同步；被其他模块导入不会自行写入派生文件。
+ */
 async function main() {
 	if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
 		await synchronizeMetadata(process.argv.includes('--check'));

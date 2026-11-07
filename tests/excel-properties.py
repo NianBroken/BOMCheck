@@ -1,4 +1,6 @@
-"""在独立Excel进程中核实文档属性并截取真实属性窗口，不改写导出样例。"""
+"""在独立 Excel 进程中只读打开导出样例，核对标准与自定义文档属性。
+另开线程观察真实属性对话框并截图，主线程维持 Excel 模态对话框调用。
+最终关闭只读工作簿、退出独立进程并清理临时目录。"""
 import argparse
 import json
 import sys
@@ -15,13 +17,16 @@ parser=argparse.ArgumentParser()
 parser.add_argument('--file',required=True)
 parser.add_argument('--output')
 args=parser.parse_args()
+# 没有指定输出目录时使用当前运行独立临时目录，避免截图混入项目源文件。
 temporary=tempfile.TemporaryDirectory(prefix='bomcheck-excel-')
 output=Path(args.output) if args.output else Path(temporary.name)
 output.mkdir(parents=True,exist_ok=True)
+# 建立独立 Excel 应用，不连接用户原有工作簿进程，样例以 ReadOnly 打开。
 app=win32com.client.DispatchEx('Excel.Application')
 app.Visible=True
 book=app.Workbooks.Open(str(Path(args.file).resolve()),ReadOnly=True)
 report={'standard':{},'custom':{},'tabs':[]}
+# 从 Excel 实际文档属性接口取值，不用工作簿文件名或自建对象替代验证。
 for key in ['Author','Last Author','Company','Keywords','Comments']:
  report['standard'][key]=book.BuiltinDocumentProperties(key).Value
 for p in book.CustomDocumentProperties:
@@ -33,6 +38,8 @@ assert report['custom']['Copyright']=='NianBroken'
 assert report['custom']['Website']==report['custom']['Link']=='https://www.klaio.top/'
 main_handle=app.Hwnd
 failures=[]
+# 等待属于当前 Excel 主窗口的可见原生属性对话框，遍历摘要与自定义页并保存截图。
+# 线程异常保留在 failures，主线程结束模态调用后统一报告。
 def inspect_dialog():
  try:
   deadline=time.monotonic()+15
@@ -52,11 +59,13 @@ def inspect_dialog():
  except BaseException as error:
   failures.append(str(error))
   win32gui.PostMessage(main_handle,0x0010,0,0)
+# 观察线程使用 daemon，主线程开启属性对话框后等待其完成，再验证报告没有线程失败。
 thread=threading.Thread(target=inspect_dialog,daemon=True)
 try:
  thread.start();app.Dialogs(474).Show();thread.join(20)
  if failures: raise RuntimeError('; '.join(failures))
  (output/'excel-properties.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
  print('Excel标准属性、自定义属性与实际属性窗口核验通过')
+# 不保存关闭工作簿并退出当前独立 Excel，临时目录始终释放。
 finally:
  book.Close(SaveChanges=False);app.Quit();temporary.cleanup()

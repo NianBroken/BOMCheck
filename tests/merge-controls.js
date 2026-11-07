@@ -1,12 +1,22 @@
+/**
+ * 在已经导入有效数据的真实扩展页面检查表格交互与控件状态。
+ * 脚本要求当前预览存在数据列，用真实节点引用核对切页是否重建表格。
+ */
 /** 在真实扩展窗口验证完整列表、切页状态、四字操作及分隔符草稿。 */
 (async () => {
 	const $ = id => document.getElementById(id);
 	const checks = [];
+	/**
+	 * 失败直接抛出，通过后才把检查文字加入结果数组。
+	 */
 	const assert = (value, text) => {
 		if (!value)
 			throw new Error(text);
 		checks.push(text);
 	};
+	/**
+	 * 等待任务锁解除，供该已就绪测试环境中的短操作衔接使用。
+	 */
 	const wait = async () => {
 		while ($('refresh').disabled) await new Promise(r => setTimeout(r, 40));
 	};
@@ -17,9 +27,15 @@
 	assert(!document.querySelector('header,footer,#backup,#version'), '界面没有横幅页脚或备份入口');
 	$('tab-preview').click();
 	await new Promise(r => setTimeout(r, 150));
+	/**
+	 * 保存表格视口、实例节点及筛选框，后续以同一节点验证切页保留。
+	 */
 	const table = $('preview').querySelector('.tabulator-tableholder');
 	const node = $('preview').querySelector('.tabulator-table');
 	const filter = $('preview').querySelector('.tabulator-header-filter input');
+	/**
+	 * 向真实过滤框派发键盘事件，检查筛选空结果保留表头且采用明确提示。
+	 */
 	filter.value = '不会匹配的完整筛选';
 	filter.dispatchEvent(new KeyboardEvent('keyup', { key: 'x', code: 'KeyX', bubbles: true }));
 	await new Promise(r => setTimeout(r, 450));
@@ -34,6 +50,9 @@
 	table.scrollLeft = Math.min(300, table.scrollWidth - table.clientWidth);
 	table.scrollTop = Math.min(400, table.scrollHeight - table.clientHeight);
 	await new Promise(r => setTimeout(r, 100));
+	/**
+	 * 记录实际横纵滚动位置，切页返回后允许小于两像素的布局舍入差异。
+	 */
 	const position = [table.scrollLeft, table.scrollTop];
 	$('tab-issues').click();
 	$('tab-preview').click();
@@ -46,6 +65,9 @@
 	$('tab-preview').click();
 	assert(count() === 3, '切页清除空分隔符且保留有效配置');
 	$('tab-file').click();
+	/**
+	 * 用户修改大小写后重载工程仍应保留该选择，结束前显式恢复初始选项。
+	 */
 	$('ignoreCase').checked = false;
 	$('ignoreCase').dispatchEvent(new Event('change'));
 	$('refresh').click();
@@ -53,6 +75,9 @@
 	assert(!$('ignoreCase').checked, '重载工程保留用户大小写选择');
 	$('ignoreCase').checked = true;
 	$('ignoreCase').dispatchEvent(new Event('change'));
+	/**
+	 * 逐面板核对说明唯一及正文宽度，最后确认没有基础记录的工程差异隐藏空表头。
+	 */
 	for (const tab of document.querySelectorAll('[role=tab]')) {
 		tab.click();
 		await new Promise(r => setTimeout(r, 80));

@@ -1,3 +1,8 @@
+/**
+ * 在真实扩展窗口验证清单预览、双表导出、有序属性合并和删除确认。
+ * 端口与窗口句柄由参数提供，参考文件由环境变量指定，工程名称必须属于独立测试范围。
+ * 不同模式执行的场景不同，合并测试在 finally 恢复原属性，删除模式显式通过宿主撤销恢复。
+ */
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs/promises';
@@ -7,12 +12,18 @@ import * as XLSX from 'xlsx';
 import { exportInfo, jsonExportInfo } from '../export-info.mjs';
 import { withTestOutput } from './test-output.mjs';
 
-/** 测试通过真实菜单、文件对话框和扩展控件执行，工程数据只用公开接口核验。 */
+/**
+ * 每次输出使用独立临时目录，测试步骤脚本和 JSON 证据按序号命名。
+ * 启动时关闭旧扩展窗口并从真实菜单打开，验证默认设置后才读取测试工程。
+ */
 async function main(outputDirectory) {
 	const [port, handle] = process.argv.slice(2);
 	const label = String(port);
 	const prefix = `${outputDirectory}/merge-${label}`;
 	let serial = 0;
+	/**
+	 * 同步等待子脚本结束，非零退出状态带实际标准错误或输出进入断言，不继续假定操作成功。
+	 */
 	function run(command, args) {
 		const execution = spawnSync(command, args, {
 			encoding: 'utf8',
@@ -20,6 +31,9 @@ async function main(outputDirectory) {
 		});
 		assert.equal(execution.status, 0, execution.stderr || execution.stdout);
 	}
+	/**
+	 * 将代码写为 UTF-8 临时文件，按根页面或扩展页面上下文执行，再从返回报告取普通值。
+	 */
 	async function evaluate(code, name, scope = 'ui') {
 		const source = `${prefix}-current.js`;
 		const output = `${prefix}-${String(++serial).padStart(3, '0')}-${name}.json`;
@@ -33,6 +47,9 @@ async function main(outputDirectory) {
 		]);
 		return JSON.parse(await fs.readFile(output, 'utf8')).result.result.value;
 	}
+	/**
+	 * 注入每次界面表达式共用的控件定位及有限等待函数，等待错误包含实际顶部状态。
+	 */
 	const ready = `const $=id=>document.getElementById(id);const wait=async(test)=>{const end=Date.now()+45000;while(!test()){if(Date.now()>end)throw Error('界面状态等待超时：'+$('status').textContent);await new Promise(r=>setTimeout(r,40));}};`;
 	const idle = `(async()=>{${ready}await wait(()=>!$('refresh').disabled);return $('status').textContent;})()`;
 	if (await evaluate('!!document.querySelector("iframe[src^=blob]")', 'window-exists', 'root')) {
@@ -47,6 +64,10 @@ async function main(outputDirectory) {
 	await fs.writeFile(`${outputDirectory}/merge-smoke${label}.json`, JSON.stringify(smoke, null, 2), 'utf8');
 	assert.equal(smoke.defaultFilePage, true);
 	assert.equal(smoke.ignoreCase, true);
+	/**
+	 * 通过公开 eda 接口读取真实当前工程和器件，拒绝非 BOMCheck_ 工程。
+	 * 快照按图元 id 排序，便于取消和恢复后进行完整结构比较。
+	 */
 	const read = `(async()=>{const p=await eda.dmt_Project.getCurrentProjectInfo();if(!p.friendlyName.startsWith('BOMCheck_'))throw Error('测试范围必须为独立工程');return {project:p.friendlyName,version:eda.sys_Environment.getEditorCurrentVersion(),components:(await eda.pcb_PrimitiveComponent.getAll()).map(c=>({id:c.getState_PrimitiveId(),ref:c.getState_Designator(),name:c.getState_Name(),supplier:c.getState_SupplierId(),other:c.getState_OtherProperty()})).sort((a,b)=>a.id.localeCompare(b.id))};})()`;
 	const before = await evaluate(read, 'before');
 	assert.equal(before.components.length, 479);
@@ -57,6 +78,9 @@ async function main(outputDirectory) {
 		merge: {},
 		exported: [],
 	};
+	/**
+	 * 切回文件设置页后用原生对话框导入指定文件，再等待任务锁解除。
+	 */
 	async function choose(file) {
 		await evaluate('document.getElementById("tab-file").click();true', 'file-page');
 		run('python', [
@@ -68,9 +92,15 @@ async function main(outputDirectory) {
 		]);
 		await evaluate(idle, 'file-loaded');
 	}
+	/**
+	 * 从实际控件触发核对，等待状态明确包含完成文字，不能只以按钮短暂可用判断完成。
+	 */
 	async function check() {
 		await evaluate(`(async()=>{${ready}await wait(()=>!$('start').disabled);$('start').click();await wait(()=>!$('refresh').disabled&&$('status').textContent.includes('器件核对已经完成'));return $('summary').textContent;})()`, 'checked');
 	}
+	/**
+	 * 删除当前运行同名输出后通过原生保存流程导出，最终文件必须存在且长度大于零。
+	 */
 	async function save(button, destination) {
 		await fs.rm(destination, { force: true });
 		run('python', [
@@ -85,6 +115,10 @@ async function main(outputDirectory) {
 		await evaluate(idle, 'saved');
 		assert.ok((await fs.stat(destination)).size > 0);
 	}
+	/**
+	 * 删除场景只从完整位号清单移除 C54，确认差异仅对应测试目标。
+	 * 先放弃删除核对全体不变，再真实删除、关闭扩展并用宿主撤销恢复。
+	 */
 	if (process.argv[4] === 'deletion') {
 		const file = `${prefix}-delete.csv`;
 		await fs.writeFile(file, `位号\n${before.components.filter(c => c.ref !== 'C54').map(c => `"${c.ref.replaceAll('"', '""')}"`).join('\n')}`, 'utf8');
@@ -122,9 +156,15 @@ async function main(outputDirectory) {
 		console.log('删除取消、实际删除及撤销恢复核验通过');
 		return;
 	}
+	/**
+	 * 完整基准模式必须显式传入参考目录，递归收集恰好三份非 Office 临时 Excel。
+	 */
 	const directory = process.env.BOMCHECK_REFERENCE_DIR;
 	assert.ok(directory, '请设置BOMCHECK_REFERENCE_DIR为参考文件目录');
 	const files = [];
+	/**
+	 * 参考目录递归遍历，保留真实文件路径供原生文件对话框读取。
+	 */
 	async function walk(dir) {
 		for (const entry of await fs.readdir(dir, { withFileTypes: true })) {
 			const file = path.join(dir, entry.name);
@@ -136,6 +176,9 @@ async function main(outputDirectory) {
 	}
 	await walk(directory);
 	assert.equal(files.length, 3);
+	/**
+	 * 逐份导入并滚动预览到底部，回读导出 Excel 检查空表、差异数量和身份属性。
+	 */
 	for (const file of files) {
 		await choose(file);
 		await check();
@@ -172,11 +215,21 @@ async function main(outputDirectory) {
 	await fs.writeFile(csv, '\uFEFF位号,代号,描述,附加\r\nC54,001,甲,末\r\nC55,002,乙,\r\n', 'utf8');
 	await choose(csv);
 	await check();
+	/**
+	 * 仅保存本测试会写入的两个器件原值，恢复时按原图元 id 写回并保存。
+	 */
 	const originalTargets = before.components.filter(c => ['C54', 'C55'].includes(c.ref));
 	assert.equal(originalTargets.length, 2);
+	/**
+	 * 通过真实映射控件建立目标和有序来源，change 事件驱动编辑器模型。
+	 * 分隔符草稿只在多来源控件存在时设置，单来源不创建隐藏的文本区域。
+	 */
 	async function groups(config) {
-		await evaluate(`(()=>{const $=id=>document.getElementById(id);$('tab-mapping').click();for(const b of [...$('mappings').querySelectorAll('[data-action="removeMapping"]')])b.click();for(const cfg of ${JSON.stringify(config)}){$('addMapping').click();const id=$('mappings').lastElementChild.dataset.group;const panel=()=>$('mappings').querySelector('[data-group="'+id+'"]');let target=panel().querySelector('select');target.value=cfg.target;target.dispatchEvent(new Event('change'));for(let i=0;i<cfg.columns.length;i++){if(i)panel().querySelector('[data-action="addSource"]').click();const s=panel().querySelectorAll('.mapping-source select')[i];s.value=cfg.columns[i];if(!s.value)throw Error('来源列不可选');s.dispatchEvent(new Event('change'));}const t=panel().querySelector('textarea');t.value=cfg.separator??'';t.dispatchEvent(new Event('input'));}return [...$('mappings').querySelectorAll('button')].map(b=>b.textContent);})()`, 'mapping-configured');
+		await evaluate(`(()=>{const $=id=>document.getElementById(id);$('tab-mapping').click();for(const b of [...$('mappings').querySelectorAll('[data-action="removeMapping"]')])b.click();for(const cfg of ${JSON.stringify(config)}){$('addMapping').click();const id=$('mappings').lastElementChild.dataset.group;const panel=()=>$('mappings').querySelector('[data-group="'+id+'"]');let target=panel().querySelector('select');target.value=cfg.target;target.dispatchEvent(new Event('change'));for(let i=0;i<cfg.columns.length;i++){if(i)panel().querySelector('[data-action="addSource"]').click();const s=panel().querySelectorAll('.mapping-source select')[i];s.value=cfg.columns[i];if(!s.value)throw Error('来源列不可选');s.dispatchEvent(new Event('change'));}const t=panel().querySelector('textarea');if(t){t.value=cfg.separator??'';t.dispatchEvent(new Event('input'));}}return [...$('mappings').querySelectorAll('button')].map(b=>b.textContent);})()`, 'mapping-configured');
 	}
+	/**
+	 * 触发按钮后核实宿主确认框内容，再选择实际按钮，等待当前运行操作解除忙碌状态。
+	 */
 	async function action(id, answer) {
 		await evaluate(`document.getElementById('${id}').click();true`, `click-${id}`);
 		if (answer) {
@@ -261,6 +314,9 @@ async function main(outputDirectory) {
 		await evaluate(`(()=>{const p=document.querySelector('.mapping');p.querySelector('[data-action="moveDown"]').click();return true;})()`, 'reordered');
 		await action('run', '确认写入');
 		assert.equal((await evaluate(read, 'reordered-read')).components.find(c => c.ref === 'C54').name, '甲001');
+		/**
+		 * 相同位号不同来源片段形成列内冲突，即使直接拼接相同也必须隔离；另一器件仍应写入。
+		 */
 		const invalidFile = `${prefix}-conflict.csv`;
 		await fs.writeFile(invalidFile, '\uFEFF位号,代号,描述\r\nC54,ab,c\r\nC54,a,bc\r\nC55,003,丙\r\n,无效,行\r\n', 'utf8');
 		await choose(invalidFile);

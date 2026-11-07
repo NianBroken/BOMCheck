@@ -1,3 +1,5 @@
+# 根目录运行资源、依赖、测试缓存和安装包均为可再生内容，不纳入源码版本管理。
+# 后续无根路径前缀的同类规则也匹配嵌套目录，忽略项不改变实际构建文件清单。
 /coverage/
 /dist/
 /node_modules/
@@ -30,7 +32,7 @@ pnpm-debug.log*
 *.bak
 *~
 
-# 本机配置与系统文件
+# 本机配置与系统文件。环境模板通过下方否定规则保留，真实环境文件仍然忽略。
 .idea/
 .vs/
 .history/
@@ -51,7 +53,7 @@ $RECYCLE.BIN/
 *.swo
 ~$*
 
-# 工具缓存与临时目录
+# 工具缓存与临时目录。tests/.run-* 为测试每次运行建立的临时输出，退出时另由测试清理。
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
@@ -64,3 +66,11 @@ temp/
 Thumbs.db:encryptable
 
 /tests/.run-*/
+
+# 本机编辑器配置、崩溃转储与依赖工具缓存
+.vscode/
+*.dmp
+.pnpm-store/
+.yarn/cache/
+.vite/
+.turbo/

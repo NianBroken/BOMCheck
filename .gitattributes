@@ -1,2 +1,4 @@
+# JSON 文件的仓库语言识别沿用既有设置，该设置不改变 JSON 解析语法。
 *.json linguist-language=JSON-with-Comments
+# 文本文件由 Git 自动识别，并统一以 LF 保存换行，降低不同设备的无效换行差异。
 * text=auto eol=lf

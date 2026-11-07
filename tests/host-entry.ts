@@ -1,3 +1,7 @@
+/**
+ * 在真实宿主中验证范围读取、取消、写入回读、原值恢复和实际删除。
+ * 仅允许名字以 BOMCheck_ 开头的独立工程；删除验收会真实移除单个测试器件。
+ */
 import type { BomData } from '../src/model';
 import type { OperationHost } from '../src/operations';
 import { compare, planWrites } from '../src/compare';
@@ -5,7 +9,10 @@ import { EdaHost } from '../src/host';
 import { executeDelete, executeWrites } from '../src/operations';
 import { scalarText, targetFields } from '../src/rules';
 
-/** 真实宿主验收仅操作显式命名的独立工程，逐范围验证写入、恢复和删除。 */
+/**
+ * 先核对工程名称，再逐范围找带位号的目标，构造仅覆盖该位号的测试清单。
+ * 写入测试在 finally 恢复原名称，恢复后逐图元再核对；多单元对象跳过删除场景。
+ */
 export async function runHostChecks(): Promise<Record<string, unknown>> {
 	const project = await eda.dmt_Project.getCurrentProjectInfo();
 	if (!project?.friendlyName.startsWith('BOMCheck_'))
@@ -14,6 +21,9 @@ export async function runHostChecks(): Promise<Record<string, unknown>> {
 	const ranges = await host.scopes();
 	const results: Record<string, unknown>[] = [];
 	let stage = '读取范围';
+	/**
+	 * 确认端口自动通过，其他端口实际转发 EdaHost，保存异常附带阶段和范围便于定位。
+	 */
 	const port: OperationHost = {
 		confirm: async () => true,
 		assertProject: scope => host.assertProject(scope),
@@ -30,6 +40,9 @@ export async function runHostChecks(): Promise<Record<string, unknown>> {
 		remove: (scope, item) => host.remove(scope, item),
 		removeMany: (scope, items) => host.removeMany(scope, items),
 	};
+	/**
+	 * 每个范围独立读取快照，空范围只记录数量，不虚构有器件的测试结果。
+	 */
 	for (const scope of ranges.scopes) {
 		stage = `读取${scope.kind}/${scope.id}`;
 		const before = await host.readScope(scope);
@@ -39,12 +52,18 @@ export async function runHostChecks(): Promise<Record<string, unknown>> {
 			continue;
 		}
 		const selected = before.filter(item => item.designator === target.designator);
+		/**
+		 * 以文档和图元组成键保存同位号各单元原名称，避免多页同位号互相覆盖原值。
+		 */
 		const originals = new Map(selected.map(item => [
 			`${item.documentId}/${item.id}`,
 			scalarText(item.standard.name),
 		]));
 		const original = scalarText(target.standard.name);
 		const expected = `BOMCheck验收${Date.now()}`;
+		/**
+		 * 单条有效来源只对应选中位号，预期值带当前时间以区分真实执行与旧结果。
+		 */
 		const bom: BomData = {
 			file: '宿主验收.csv',
 			sheet: '验收',
@@ -88,6 +107,9 @@ export async function runHostChecks(): Promise<Record<string, unknown>> {
 				separator: '',
 			},
 		], [field], false);
+		/**
+		 * 强制构造覆盖确认并选择放弃，随后回读必须与原值相同。
+		 */
 		const canceled = await executeWrites({
 			...port,
 			confirm: async () => false,
@@ -137,6 +159,9 @@ export async function runHostChecks(): Promise<Record<string, unknown>> {
 			});
 			continue;
 		}
+		/**
+		 * 构造与工程目标不同的清单位号，使仅传入的目标成为工程独有，再验证取消和真实删除。
+		 */
 		const absent = {
 			...bom,
 			records: [
@@ -164,6 +189,9 @@ export async function runHostChecks(): Promise<Record<string, unknown>> {
 			removed: 1,
 		});
 	}
+	/**
+	 * 至少有一个范围完成写入验证才允许整体通过，全部为空不能构成有效宿主验收。
+	 */
 	if (!results.some(result => result.writeVerified))
 		throw new Error('独立工程中没有可验收器件');
 	return {
