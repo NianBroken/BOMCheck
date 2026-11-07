@@ -10,7 +10,7 @@ import { exportInfo } from '../export-info.mjs';
 import pages from '../ui/pages.json' with { type: 'json' };
 import { validateManifest } from './manifest.mjs';
 import { extensionInfo, extensionManifest, packageName, synchronizeMetadata } from './metadata.mjs';
-import { deliveryDocuments, runtimeFiles } from './package-files.mjs';
+import { runtimeFiles } from './package-files.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
@@ -54,45 +54,14 @@ export async function verifyPackage(bytes) {
 	};
 }
 
-/** 交付集合、校验清单与当前源码保持一致，未知文件会使核验失败。 */
-export async function verifyDelivery() {
-	const directory = path.join(root, 'delivery');
-	const bytes = await fs.readFile(path.join(directory, packageName));
-	const result = await verifyPackage(bytes);
-	assert.deepEqual(bytes, await fs.readFile(path.join(root, 'build/dist', packageName)));
-	const expected = [...deliveryDocuments, packageName, `${packageName}.sha256`].sort();
-	const actual = [];
-	async function collect(folder, prefix = '') {
-		for (const item of await fs.readdir(folder, { withFileTypes: true })) {
-			const name = path.posix.join(prefix, item.name);
-			if (item.isDirectory())
-				await collect(path.join(folder, item.name), name);
-			else actual.push(name);
-		}
-	}
-	await collect(directory);
-	assert.deepEqual(actual.sort(), [...expected, 'SHA256SUMS.txt'].sort());
-	for (const filename of deliveryDocuments)
-		assert.deepEqual(await fs.readFile(path.join(directory, filename)), await fs.readFile(path.join(root, filename)), filename);
-	assert.equal(await fs.readFile(path.join(directory, `${packageName}.sha256`), 'utf8'), `${result.sha256}  ${packageName}\n`);
-	const lines = (await fs.readFile(path.join(directory, 'SHA256SUMS.txt'), 'utf8')).trim().split('\n');
-	assert.equal(lines.length, expected.length);
-	const names = [];
-	for (const line of lines) {
-		const match = /^([a-f0-9]{64}) {2}(.+)$/u.exec(line);
-		assert.ok(match);
-		assert.ok(expected.includes(match[2]));
-		names.push(match[2]);
-		assert.equal(sha256(await fs.readFile(path.join(directory, match[2]))), match[1], match[2]);
-	}
-	assert.deepEqual(names.sort(), expected);
-	return { ...result, checkedFiles: expected.length, archiveVerified: true };
-}
-
+/** 直接核验最终安装包、文件集合与SHA-256校验文件。 */
 async function main() {
 	if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
 		process.chdir(root);
-		console.log(JSON.stringify(await verifyDelivery(), null, 2));
+		const output = path.join(root, 'build/dist', packageName);
+		const result = await verifyPackage(await fs.readFile(output));
+		assert.equal(await fs.readFile(`${output}.sha256`, 'utf8'), `${result.sha256}  ${packageName}\n`);
+		console.log(JSON.stringify(result, null, 2));
 	}
 }
 void main();

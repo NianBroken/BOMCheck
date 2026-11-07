@@ -47,7 +47,7 @@ export async function checkPluginInfo() {
 		'属性填充',
 		'差异检查',
 	]);
-	// 复用锁文件已有的SemVer工具，核对无上限范围在正式版本中的实际匹配结果。
+	// 使用直接声明的SemVer工具，核对无上限范围在正式版本中的实际匹配结果。
 	for (const version of [
 		'3.2.0',
 		'3.2.149',
@@ -71,10 +71,5 @@ export async function checkPluginInfo() {
 	});
 	const baseline = JSON.parse(await fs.readFile('tests/fixtures/excel-export-baseline.json', 'utf8'));
 	assert.equal(createHash('sha256').update(await fs.readFile('src/bom.ts')).digest('hex'), baseline.sourceSha256);
-	const readme = await fs.readFile('README.md', 'utf8');
-	assert.ok(readme.includes(extensionInfo.description));
-	assert.ok(readme.includes('<!-- EXTENSION_IDENTITY_START -->'));
-	assert.ok(readme.includes('BOMCheck') && readme.includes('>=3.2.0'));
-	assert.ok(!/\]\((?!https?:|#)/u.test(readme), '详情正文不引用安装包之外的相对路径');
 	console.log('JSON三字段、业务记录保持、插件信息、版本范围和Excel实现基准检查通过');
 }

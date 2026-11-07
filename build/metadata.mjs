@@ -96,31 +96,6 @@ export async function synchronizeMetadata(check = false) {
 		else
 			await fs.writeFile(target, `${JSON.stringify(expected, null, '\t')}\n`, 'utf8');
 	}
-	/** 文档中的身份块是生成输出，正文流程说明由文档自身维护。 */
-	const identityBlocks = [
-		[
-			'README.md',
-			[
-				`名称：${info.displayName}`,
-				`英文名称：${info.englishName}`,
-				`作者：${info.author}`,
-				`网站：${info.homepage}`,
-				`源码仓库：${info.repository.url}`,
-				`版本：${info.version}`,
-				`兼容范围：${info.engines.eda}`,
-				`许可证：${info.license}`,
-			].map(line => `- ${line}`).join('\n'),
-		],
-	];
-	for (const [filename, block] of identityBlocks) {
-		const target = path.join(root, filename);
-		const actual = (await fs.readFile(target, 'utf8')).replaceAll('\r\n', '\n');
-		const expected = actual.replace(/<!-- EXTENSION_IDENTITY_START -->[\s\S]*?<!-- EXTENSION_IDENTITY_END -->/u, `<!-- EXTENSION_IDENTITY_START -->\n${block}\n<!-- EXTENSION_IDENTITY_END -->`);
-		assert.ok(actual.includes('<!-- EXTENSION_IDENTITY_START -->'), `${filename}缺少身份信息生成区域`);
-		if (check)
-			assert.equal(actual, expected, `${filename}身份信息与集中定义不一致`);
-		else await fs.writeFile(target, expected, 'utf8');
-	}
 }
 
 async function main() {

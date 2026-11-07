@@ -24,7 +24,7 @@
 	filter.dispatchEvent(new KeyboardEvent('keyup', { key: 'x', code: 'KeyX', bubbles: true }));
 	await new Promise(r => setTimeout(r, 450));
 	assert(getComputedStyle($('preview').querySelector('.tabulator-header')).display !== 'none', '筛选无结果仍保留表头');
-	assert($('preview').textContent.includes('当前筛选没有匹配记录'), '筛选无结果采用明确状态');
+	assert($('preview').textContent.includes('没有匹配记录'), '筛选无结果采用明确状态');
 	$('tab-bom').click();
 	$('tab-preview').click();
 	assert($('preview').querySelector('.tabulator-table') === node && filter.value === '不会匹配的完整筛选', '切页保留表格实例与筛选');

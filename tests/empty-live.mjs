@@ -6,13 +6,12 @@ import process from 'node:process';
 import JSZip from 'jszip';
 import * as XLSX from 'xlsx';
 import { exportInfo, jsonExportInfo } from '../export-info.mjs';
+import { withTestOutput } from './test-output.mjs';
 /** 在真实客户端验证空状态、来源数量切换、导出属性和实际写入回读。 */
-async function main() {
+async function main(outputDirectory) {
 	const [port, handle, mode = 'empty'] = process.argv.slice(2);
-	const label = port === '9224'
-		? '32'
-		: '41';
-	const prefix = `tests/output/empty-${label}`;
+	const label = String(port);
+	const prefix = `${outputDirectory}/empty-${label}`;
 	let serial = 0;
 	function run(command, args, extra = {}) {
 		const result = spawnSync(command, args, {
@@ -76,7 +75,7 @@ async function main() {
 				});
 				if (tab === 'preview' || width === 1024) {
 					await evaluate('true', `shot-${tab}`, 'ui', {
-						BOMCHECK_SCREENSHOT: `tests/output/screenshots/empty-after-${label}-${tab}-${width}x${height}.png`,
+						BOMCHECK_SCREENSHOT: `${outputDirectory}/screenshots/empty-after-${label}-${tab}-${width}x${height}.png`,
 						BOMCHECK_CLIP: JSON.stringify({
 							x: frame.x,
 							y: frame.y,
@@ -153,7 +152,8 @@ async function main() {
 				referenceFiles.push(full);
 		}
 	}
-	await findReference(process.env.BOMCHECK_REFERENCE_DIR ?? path.join(process.env.USERPROFILE, 'Desktop', '临时'));
+	assert.ok(process.env.BOMCHECK_REFERENCE_DIR, '请设置BOMCHECK_REFERENCE_DIR为参考文件目录');
+	await findReference(process.env.BOMCHECK_REFERENCE_DIR);
 	assert.equal(referenceFiles.length, 3);
 	const baseline = {
 		fullPreview: referenceFiles.sort().map(file => ({ file })),
@@ -169,7 +169,7 @@ async function main() {
 			'--handle',
 			handle,
 			'--path',
-			`tests/output/screenshots/empty-after-data-${label}-${report.baselines.length}-top.png`,
+			`${outputDirectory}/screenshots/empty-after-data-${label}-${report.baselines.length}-top.png`,
 		]);
 		await evaluate(`(async()=>{const h=document.querySelector('#preview .tabulator-tableholder');h.scrollTop=0;await new Promise(r=>setTimeout(r,150));h.scrollTop=h.scrollHeight;await new Promise(r=>setTimeout(r,300));return true;})()`, 'scroll-last');
 		run('python', [
@@ -178,7 +178,7 @@ async function main() {
 			'--handle',
 			handle,
 			'--path',
-			`tests/output/screenshots/empty-after-data-${label}-${report.baselines.length}-last.png`,
+			`${outputDirectory}/screenshots/empty-after-data-${label}-${report.baselines.length}-last.png`,
 		]);
 		const preview = await evaluate(`(()=>({summary:document.getElementById('previewState').textContent,hidden:document.getElementById('previewState').hidden,last:document.querySelector('#preview .tabulator-row:last-child').textContent}))()`, 'full-preview');
 		assert.equal(preview.hidden, false);
@@ -294,4 +294,4 @@ async function main() {
 	await fs.writeFile(`${prefix}-data.json`, JSON.stringify(report, null, 2), 'utf8');
 	console.log(`客户端${label}完整预览、来源切换、实际写入与导出属性通过`);
 }
-void main();
+void withTestOutput(main);

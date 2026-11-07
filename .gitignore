@@ -1,16 +1,11 @@
-/.vscode/*
-!/.vscode/extensions.json
-!/.vscode/settings.json
 /coverage/
 /dist/
 /node_modules/
 /.eslintcache
 debug.log
-/tests/output/
 /tests/__pycache__/
 /iframe/index.html
 /build/dist/
-/delivery/
 
 # 构建产物、依赖与运行记录
 node_modules/
@@ -22,17 +17,26 @@ __pycache__/
 *.py[cod]
 *.tsbuildinfo
 *.log
+*.log.*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.pid
+*.pid.lock
+*.stackdump
 *.tmp
 *.temp
 *.bak
 *~
-/tests/eslint-result.json
-/docs/evidence/
-/docs/导出样例/
 
 # 本机配置与系统文件
 .idea/
 .vs/
+.history/
+*.code-workspace
+*.suo
+*.user
 .env
 .env.*
 !.env.example
@@ -58,3 +62,5 @@ $RECYCLE.BIN/
 tmp/
 temp/
 Thumbs.db:encryptable
+
+/tests/.run-*/

@@ -9,21 +9,20 @@ import { synchronizeMetadata } from '../build/metadata.mjs';
 import { checkPluginInfo } from './info-check.mjs';
 import { checkManifestAndPackaging } from './manifest.mjs';
 
-async function main() {
+async function run(temporary) {
 	await synchronizeMetadata(true);
 	await checkPluginInfo();
 	await checkManifestAndPackaging();
 	/** 测试覆盖数据丢失、错误对应和批量确认次数，临时构建只写入测试产物目录。 */
-	await fs.mkdir('tests/output', { recursive: true });
 	await esbuild.build({
 		entryPoints: ['tests/unit.ts'],
-		outfile: 'tests/output/unit.mjs',
+		outfile: path.join(temporary, 'unit.mjs'),
 		bundle: true,
 		platform: 'node',
 		format: 'esm',
 		packages: 'external',
 	});
-	const { runUnit } = await import(pathToFileURL(path.resolve('tests/output/unit.mjs')).href);
+	const { runUnit } = await import(pathToFileURL(path.resolve(path.join(temporary, 'unit.mjs'))).href);
 	await runUnit();
 	const output = await esbuild.build({
 		entryPoints: ['tests/live-entry.ts'],
@@ -33,14 +32,14 @@ async function main() {
 		format: 'esm',
 		packages: 'external',
 	});
-	await fs.writeFile('tests/output/core.mjs', output.outputFiles[0].text, 'utf8');
-	const { loadWorkbook, buildBom, compare, exportTables } = await import(pathToFileURL(path.resolve('tests/output/core.mjs')).href);
+	await fs.writeFile(path.join(temporary, 'core.mjs'), output.outputFiles[0].text, 'utf8');
+	const { loadWorkbook, buildBom, compare, exportTables } = await import(pathToFileURL(path.resolve(path.join(temporary, 'core.mjs'))).href);
 
 	if (!process.argv[2]) {
 		console.log('独立单元测试通过；参考文件基准请显式传入目录');
 		return;
 	}
-	/** 参考目录来自命令参数或系统桌面，不把特定用户路径写入项目。 */
+	/** 参考目录来自命令参数，不把特定用户路径写入项目。 */
 	const referenceDir = process.argv[2];
 	const files = [];
 	async function walk(directory) {
@@ -110,8 +109,17 @@ async function main() {
 		});
 	}
 	assert.equal(files.length, 3);
-	await fs.writeFile('tests/output/reference-results.json', JSON.stringify(reports, null, 2), 'utf8');
+	await fs.writeFile(path.join(temporary, 'reference-results.json'), JSON.stringify(reports, null, 2), 'utf8');
 	console.log('三份真实BOM基准与双工作表导出检查通过');
 }
 
+async function main() {
+	const temporary = await fs.mkdtemp(path.resolve('tests/.run-'));
+	try {
+		await run(temporary);
+	}
+	finally {
+		await fs.rm(temporary, { recursive: true, force: true });
+	}
+}
 void main();

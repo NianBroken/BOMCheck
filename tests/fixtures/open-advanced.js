@@ -1,5 +1,0 @@
-/** 使用实际可见菜单元素执行测试导航。 */
-(() => {
-	document.querySelector('[data-test="Advanced"]').click();
-	return true;
-})();

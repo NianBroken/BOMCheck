@@ -5,14 +5,13 @@ import path from 'node:path';
 import process from 'node:process';
 import * as XLSX from 'xlsx';
 import { exportInfo, jsonExportInfo } from '../export-info.mjs';
+import { withTestOutput } from './test-output.mjs';
 
 /** 测试通过真实菜单、文件对话框和扩展控件执行，工程数据只用公开接口核验。 */
-async function main() {
+async function main(outputDirectory) {
 	const [port, handle] = process.argv.slice(2);
-	const label = port === '9224'
-		? '32'
-		: '41';
-	const prefix = `tests/output/merge-${label}`;
+	const label = String(port);
+	const prefix = `${outputDirectory}/merge-${label}`;
 	let serial = 0;
 	function run(command, args) {
 		const execution = spawnSync(command, args, {
@@ -45,7 +44,7 @@ async function main() {
 	await evaluate('document.querySelector(\'[data-test="启动核对"]\').click();true', 'open-window', 'root');
 	await evaluate(idle, 'ready');
 	const smoke = await evaluate(await fs.readFile('tests/fixtures/final-smoke.js', 'utf8'), 'smoke');
-	await fs.writeFile(`tests/output/merge-smoke${label}.json`, JSON.stringify(smoke, null, 2), 'utf8');
+	await fs.writeFile(`${outputDirectory}/merge-smoke${label}.json`, JSON.stringify(smoke, null, 2), 'utf8');
 	assert.equal(smoke.defaultFilePage, true);
 	assert.equal(smoke.ignoreCase, true);
 	const read = `(async()=>{const p=await eda.dmt_Project.getCurrentProjectInfo();if(!p.friendlyName.startsWith('BOMCheck_'))throw Error('测试范围必须为独立工程');return {project:p.friendlyName,version:eda.sys_Environment.getEditorCurrentVersion(),components:(await eda.pcb_PrimitiveComponent.getAll()).map(c=>({id:c.getState_PrimitiveId(),ref:c.getState_Designator(),name:c.getState_Name(),supplier:c.getState_SupplierId(),other:c.getState_OtherProperty()})).sort((a,b)=>a.id.localeCompare(b.id))};})()`;
@@ -123,7 +122,8 @@ async function main() {
 		console.log('删除取消、实际删除及撤销恢复核验通过');
 		return;
 	}
-	const directory = path.join(process.env.USERPROFILE, 'Desktop', '临时');
+	const directory = process.env.BOMCHECK_REFERENCE_DIR;
+	assert.ok(directory, '请设置BOMCHECK_REFERENCE_DIR为参考文件目录');
 	const files = [];
 	async function walk(dir) {
 		for (const entry of await fs.readdir(dir, { withFileTypes: true })) {
@@ -292,4 +292,4 @@ async function main() {
 	await fs.writeFile(`${prefix}-report.json`, JSON.stringify(report, null, 2), 'utf8');
 	console.log(JSON.stringify(report));
 }
-void main();
+void withTestOutput(main);

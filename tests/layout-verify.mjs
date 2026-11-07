@@ -2,15 +2,17 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs/promises';
 import process from 'node:process';
+import pages from '../ui/pages.json' with { type: 'json' };
+import { withTestOutput } from './test-output.mjs';
 
 /** 客户端内调整真实窗口的内容尺寸，逐项核对布局并截取编辑器实际渲染结果。 */
-async function main() {
+async function main(outputDirectory) {
 	const port = process.argv[2];
-	const label = port === '9224'
-		? '32'
-		: '41';
-	const output = 'tests/output';
-	const prefix = process.argv[3] ?? 'ui-after';
+	const label = String(port);
+	const output = outputDirectory;
+	const prefix = process.argv[3] ?? 'layout';
+	const page = process.argv[4] ?? 'file';
+	assert.ok(pages.some(item => item.id === page), '页面标识无效');
 	const sizes = [
 		[640, 480],
 		[1024, 768],
@@ -39,7 +41,7 @@ async function main() {
 		const resize = `${output}/layout-size-${label}-${width}.json`;
 		run(source, resize, 'root');
 		const frame = JSON.parse(await fs.readFile(resize, 'utf8')).result.result.value;
-		await fs.writeFile(source, `document.activeElement.blur();document.getElementById('panel-file').scrollTop=0;document.getElementById('tab-file').click();`, 'utf8');
+		await fs.writeFile(source, `document.activeElement.blur();document.getElementById('panel-${page}').scrollTop=0;document.getElementById('tab-${page}').click();`, 'utf8');
 		run(source, `${output}/layout-top-${label}.json`, 'ui');
 		const destination = `${output}/layout-${label}-${width}.json`;
 		run('tests/fixtures/layout-inspect.js', destination, 'ui', {
@@ -57,7 +59,9 @@ async function main() {
 		assert.equal(layout.pageOverflow, false);
 		assert.ok(layout.visible.every(panel => panel.scrollWidth <= panel.width));
 		assert.ok(layout.tabs.every(tab => tab.rect.left >= 0 && tab.rect.right <= width));
-		assert.ok(layout.start.top >= 0 && layout.start.bottom <= height);
+		assert.equal(layout.visible[0].id, `panel-${page}`);
+		if (page === 'file')
+			assert.ok(layout.start.top >= 0 && layout.start.bottom <= height);
 		reports.push({
 			width,
 			height,
@@ -69,4 +73,4 @@ async function main() {
 	await fs.writeFile(`${output}/${prefix}-layout-verification-${label}.json`, JSON.stringify(reports, null, 2), 'utf8');
 	console.log(JSON.stringify({ port, reports }));
 }
-void main();
+void withTestOutput(main);

@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
@@ -9,9 +8,10 @@ import commands from '../ui/commands.json' with { type: 'json' };
 import pages from '../ui/pages.json' with { type: 'json' };
 import { packageName, synchronizeMetadata } from './metadata.mjs';
 import { packageExtension } from './utils.ts';
+import { verifyPackage } from './verify-package.mjs';
 
 async function main() {
-/** 构建只读取系统依赖，内联页面包含完整运行资源，避免宿主递归加载资源的限制。 */
+	/** 构建只读取系统依赖，内联页面包含完整运行资源，避免宿主递归加载资源的限制。 */
 	const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 	process.chdir(root);
 	await synchronizeMetadata();
@@ -66,18 +66,8 @@ async function main() {
 	const output = path.join(root, 'build/dist', packageName);
 	await packageExtension(root, output);
 	const bytes = await fs.readFile(output);
-	const hash = createHash('sha256').update(bytes).digest('hex');
+	const { sha256: hash } = await verifyPackage(bytes);
 	await fs.writeFile(`${output}.sha256`, `${hash}  ${path.basename(output)}\n`, 'utf8');
-	const manifest = JSON.parse(await fs.readFile('package.json', 'utf8'));
-	const packages = {};
-	for (const name of Object.keys({
-		...manifest.dependencies,
-		...manifest.devDependencies,
-	})) {
-		const installed = JSON.parse(await fs.readFile(path.join('node_modules', name, 'package.json'), 'utf8'));
-		packages[name] = installed.version;
-	}
-	await fs.writeFile('dependency-versions.json', `${JSON.stringify({ sdk: '1.6.29', packages }, null, 2)}\n`, 'utf8');
 	console.log(`扩展打包完成：${output}\nSHA-256：${hash}`);
 }
 

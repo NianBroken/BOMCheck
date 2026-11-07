@@ -4,6 +4,7 @@ import json
 import sys
 import threading
 import time
+import tempfile
 from pathlib import Path
 import win32com.client
 import win32gui
@@ -12,7 +13,11 @@ from pywinauto import Desktop
 sys.stdout.reconfigure(encoding='utf-8')
 parser=argparse.ArgumentParser()
 parser.add_argument('--file',required=True)
+parser.add_argument('--output')
 args=parser.parse_args()
+temporary=tempfile.TemporaryDirectory(prefix='bomcheck-excel-')
+output=Path(args.output) if args.output else Path(temporary.name)
+output.mkdir(parents=True,exist_ok=True)
 app=win32com.client.DispatchEx('Excel.Application')
 app.Visible=True
 book=app.Workbooks.Open(str(Path(args.file).resolve()),ReadOnly=True)
@@ -42,7 +47,7 @@ def inspect_dialog():
    if name in ['摘要','自定义','Summary','Custom']:
     tab.select();time.sleep(.15);dialog.set_focus()
     kind='summary' if name in ['摘要','Summary'] else 'custom'
-    dialog.capture_as_image().save(f'tests/output/screenshots/empty-excel-{kind}.png')
+    dialog.capture_as_image().save(output / f'excel-{kind}.png')
   dialog.child_window(title='取消',control_type='Button').click()
  except BaseException as error:
   failures.append(str(error))
@@ -51,7 +56,7 @@ thread=threading.Thread(target=inspect_dialog,daemon=True)
 try:
  thread.start();app.Dialogs(474).Show();thread.join(20)
  if failures: raise RuntimeError('; '.join(failures))
- Path('tests/output/empty-excel-properties.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
+ (output/'excel-properties.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
  print('Excel标准属性、自定义属性与实际属性窗口核验通过')
 finally:
- book.Close(SaveChanges=False);app.Quit()
+ book.Close(SaveChanges=False);app.Quit();temporary.cleanup()
