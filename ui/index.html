@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width,initial-scale=1">
+	<title><!-- APP_TITLE --></title>
+	<style>/* APP_CSS */</style>
+</head>
+<body>
+	<nav id="tabs" class="tabs" role="tablist" aria-label="功能页面">
+		<!-- PAGE_NAV -->
+	</nav>
+	<p id="status" role="status" aria-live="polite"><!-- MESSAGE:initial --></p>
+	<main id="panels">
+		<section id="panel-file" role="tabpanel" aria-labelledby="tab-file">
+			<div class="panel-heading"><h2><!-- TITLE:file --></h2></div><p class="page-note" role="note"><!-- NOTE:file --></p>
+			<div class="scope-row"><label class="field">工程范围<select id="scope" data-config></select></label><button id="refresh" data-config><!-- COMMAND:refresh --></button></div>
+			<div class="file-row"><div class="file-choice"><button id="choose" data-config><!-- COMMAND:choose --></button><span id="filename">尚未选择文件</span></div><label class="field">文本编码<select id="encoding" data-config><option value="auto">自动识别 / UTF-8</option><option value="utf-8">UTF-8</option><option value="gb18030">GB18030 / GBK</option><option value="utf-16le">UTF-16 LE</option><option value="utf-16be">UTF-16 BE</option><option value="big5">Big5</option></select></label></div>
+			<div class="parse-grid"><label class="field">工作表<select id="sheet" data-config></select></label><label class="field">表头行<input id="header" type="number" min="1" step="1" value="1" data-config></label><label class="field">位号列<select id="reference" data-config><option value="">请选择位号列</option></select></label></div>
+			<div class="rules-grid"><div class="separator-field"><h3>位号分隔符</h3><div id="separators"></div><div class="line"><button id="addSeparator" data-config><!-- COMMAND:addSeparator --></button><button id="resetSeparators" data-config><!-- COMMAND:resetSeparators --></button></div><p id="separatorHint" class="field-state" aria-live="polite"></p></div><div class="match-options"><h3>匹配规则</h3><label class="check"><input id="ignoreCase" type="checkbox" data-config>忽略位号大小写</label></div></div>
+			<div class="actions"><button id="start" class="primary" disabled><!-- COMMAND:start --></button><button id="export" data-result disabled><!-- COMMAND:export --></button><span id="summary"><!-- MESSAGE:chooseBom --></span></div>
+
+		</section>
+		<section id="panel-preview" role="tabpanel" aria-labelledby="tab-preview" hidden><div class="panel-heading"><h2><!-- TITLE:preview --></h2></div><p class="page-note" role="note"><!-- NOTE:preview --></p><p id="previewState" class="field-state" hidden aria-live="polite"><!-- MESSAGE:fileNone --></p><div id="preview" class="data-table"></div></section>
+		<section id="panel-project" role="tabpanel" aria-labelledby="tab-project" hidden><div class="panel-heading"><h2><!-- TITLE:project --></h2></div><p class="page-note" role="note"><!-- NOTE:project --></p><div id="projectOnly" class="data-table"></div><div class="actions"><button id="delete" class="danger" data-result disabled><!-- COMMAND:delete --></button></div></section>
+		<section id="panel-bom" role="tabpanel" aria-labelledby="tab-bom" hidden><div class="panel-heading"><h2><!-- TITLE:bom --></h2></div><p class="page-note" role="note"><!-- NOTE:bom --></p><div id="bomOnly" class="data-table"></div></section>
+		<section id="panel-mapping" role="tabpanel" aria-labelledby="tab-mapping" hidden><div class="panel-heading"><h2><!-- TITLE:mapping --></h2></div><div class="mapping-options"><label class="check"><input id="clearEmpty" type="checkbox" data-config>使用BOM空值清空目标属性</label></div><div class="line mapping-actions"><button id="addMapping" data-result disabled><!-- COMMAND:addMapping --></button><button id="previewWritesButton" data-result disabled><!-- COMMAND:previewWritesButton --></button><button id="run" class="primary" data-result disabled><!-- COMMAND:run --></button></div><p class="page-note" role="note"><!-- NOTE:mapping --></p><div id="mappings"></div><div id="writePreview" class="data-table"></div></section>
+		<section id="panel-issues" role="tabpanel" aria-labelledby="tab-issues" hidden><div class="panel-heading"><h2><!-- TITLE:issues --></h2></div><p class="page-note" role="note"><!-- NOTE:issues --></p><div id="issues" class="data-table"></div></section>
+		<section id="panel-operation" role="tabpanel" aria-labelledby="tab-operation" hidden><div class="panel-heading"><h2><!-- TITLE:operation --></h2><button id="exportRecord" data-config><!-- COMMAND:exportRecord --></button></div><p class="page-note" role="note"><!-- NOTE:operation --></p><div id="operation" class="data-table"></div></section>
+	</main>
+	<dialog id="detail"><div id="detailScroll"><h2>记录全部信息</h2><dl id="detailContent"></dl><button id="closeDetail"><!-- COMMAND:closeDetail --></button></div></dialog>
+	<script>/* APP_JS */</script>
+</body>
+</html>

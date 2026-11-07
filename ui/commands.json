@@ -1,0 +1,8 @@
+{
+	"refresh": "重载工程", "choose": "导入清单", "start": "核对器件", "export": "保存差异",
+	"delete": "删除余件", "exportRecord": "保存日志", "addMapping": "创建映射", "removeMapping": "删除映射",
+	"addSource": "添加来源", "removeSource": "移除来源", "moveUp": "上移字段", "moveDown": "下移字段",
+	"previewWritesButton": "预演写入", "run": "写入属性", "addSeparator": "添加符号", "removeSeparator": "移除符号",
+	"resetSeparators": "重置分隔", "closeDetail": "关闭详情", "openMenu": "启动核对", "aboutMenu": "插件信息",
+	"confirmWrite": "确认写入", "cancelWrite": "放弃写入", "confirmDelete": "确认删除", "cancelDelete": "放弃删除", "closeInfo": "关闭说明"
+}

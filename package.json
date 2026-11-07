@@ -1,0 +1,49 @@
+{
+	"name": "bomcheck",
+	"type": "module",
+	"version": "1.0.0",
+	"description": "按器件位号核对物料清单与原理图或印制电路板，支持清单预览、双向差异检查、属性合并填充、器件删除确认及结果导出。",
+	"author": "NianBroken",
+	"license": "Apache-2.0",
+	"homepage": "https://www.klaio.top/",
+	"engines": {
+		"node": ">=22.18.0"
+	},
+	"scripts": {
+		"build": "node build/release.mjs",
+		"typecheck": "node build/check.mjs typecheck",
+		"lint": "node build/check.mjs lint",
+		"test": "node tests/run.mjs"
+	},
+	"devDependencies": {
+		"@antfu/eslint-config": "10.0.0",
+		"@jlceda/pro-api-types": "0.4.27",
+		"@types/fs-extra": "11.0.4",
+		"esbuild": "0.28.2",
+		"eslint": "10.14.0",
+		"fs-extra": "11.3.0",
+		"typescript": "5.7.3"
+	},
+	"private": true,
+	"allowScripts": {
+		"esbuild": true
+	},
+	"dependencies": {
+		"jszip": "3.10.1",
+		"overlayscrollbars": "2.17.0",
+		"tabulator-tables": "6.7.1",
+		"xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+	},
+	"keywords": [
+		"BOMCheck",
+		"BOM",
+		"物料清单",
+		"器件核对",
+		"属性填充",
+		"差异检查"
+	],
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/NianBroken/BOMCheck"
+	}
+}

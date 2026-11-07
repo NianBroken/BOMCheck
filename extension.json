@@ -1,0 +1,109 @@
+{
+	"name": "bomcheck",
+	"uuid": "c2db831f221449169f922e9d83edd8dc",
+	"displayName": "物料核对",
+	"description": "按器件位号核对物料清单与原理图或印制电路板，支持清单预览、双向差异检查、属性合并填充、器件删除确认及结果导出。",
+	"version": "1.0.0",
+	"homepage": "https://www.klaio.top/",
+	"license": "Apache-2.0",
+	"repository": {
+		"type": "github",
+		"url": "https://github.com/NianBroken/BOMCheck"
+	},
+	"engines": {
+		"eda": ">=3.2.0"
+	},
+	"categories": [
+		"Schematic",
+		"PCB",
+		"Project"
+	],
+	"entry": "./dist/index",
+	"publisher": "NianBroken",
+	"keywords": [
+		"BOMCheck",
+		"BOM",
+		"物料清单",
+		"器件核对",
+		"属性填充",
+		"差异检查"
+	],
+	"images": {
+		"logo": "./images/logo.png"
+	},
+	"bugs": "https://www.klaio.top/",
+	"headerMenus": {
+		"home": [
+			{
+				"id": "bomcheck-home",
+				"title": "物料核对",
+				"menuItems": [
+					{
+						"id": "bomcheck-open-home",
+						"title": "启动核对",
+						"registerFn": "openBomCheck"
+					},
+					{
+						"id": "bomcheck-about-home",
+						"title": "插件信息",
+						"registerFn": "about"
+					}
+				]
+			}
+		],
+		"sch": [
+			{
+				"id": "bomcheck-sch",
+				"title": "物料核对",
+				"menuItems": [
+					{
+						"id": "bomcheck-open-sch",
+						"title": "启动核对",
+						"registerFn": "openBomCheck"
+					},
+					{
+						"id": "bomcheck-about-sch",
+						"title": "插件信息",
+						"registerFn": "about"
+					}
+				]
+			}
+		],
+		"pcb": [
+			{
+				"id": "bomcheck-pcb",
+				"title": "物料核对",
+				"menuItems": [
+					{
+						"id": "bomcheck-open-pcb",
+						"title": "启动核对",
+						"registerFn": "openBomCheck"
+					},
+					{
+						"id": "bomcheck-about-pcb",
+						"title": "插件信息",
+						"registerFn": "about"
+					}
+				]
+			}
+		],
+		"blank": [
+			{
+				"id": "bomcheck-blank",
+				"title": "物料核对",
+				"menuItems": [
+					{
+						"id": "bomcheck-open-blank",
+						"title": "启动核对",
+						"registerFn": "openBomCheck"
+					},
+					{
+						"id": "bomcheck-about-blank",
+						"title": "插件信息",
+						"registerFn": "about"
+					}
+				]
+			}
+		]
+	}
+}
